@@ -1,0 +1,118 @@
+# Proef Zweedse spraakherkenning. Modellen worden bij het bouwen gedownload; daarna alles offline.
+#
+# Testpagina (opnemen → analyse → feedback):
+#   docker compose up --build          en open http://localhost:8080
+#
+# Batch over alle opnames (stappen in volgorde; of in één keer ./proef/alles.sh):
+#   docker compose run --rm piper      # computerstem als referentie (optioneel)
+#   docker compose run --rm prep       # opnames → 16 kHz mono + .lab
+#   docker compose run --rm whisper    # vraag 1: wat zeg je?
+#   docker compose run --rm mfa        # uitlijning (woord- en klankgrenzen)
+#   docker compose run --rm klanken    # vraag 2: welke klanken?
+#   docker compose run --rm prosodie   # vraag 2/3: keuze-uitspraak, duur, toonhoogte (na mfa)
+#   docker compose run --rm verslag    # resultaten/verslag.md
+#
+# Alle containers draaien als uid 1000 (MFA's PostgreSQL mag niet als root), zodat ze
+# elkaars bestanden in werk/ kunnen lezen en schrijven.
+
+x-data: &data
+  - ./testzinnen.tsv:/data/testzinnen.tsv:ro
+  - ./opnames:/data/opnames:ro
+  - ./werk:/data/werk
+  - ./resultaten:/data/resultaten
+
+x-whisper-build: &whisper-build
+  context: ./proef
+  dockerfile: whisper/Dockerfile
+  args:
+    WHISPER_MODELLEN: "tiny base small"
+
+services:
+  # ---------- testpagina ----------
+  web:
+    build: { context: ./proef, dockerfile: web/Dockerfile }
+    image: proef-sv/web
+    user: "1000:1000"
+    ports: ["127.0.0.1:8080:8080"]   # alleen op deze pc; microfoon werkt in de browser via localhost
+    volumes:
+      - ./testzinnen.tsv:/data/testzinnen.tsv:ro
+      - ./opnames:/data/opnames      # de pagina slaat elke opname hier op
+      - ./werk:/data/werk
+    depends_on: [whisper-api, klanken-api, mfa-api]
+
+  whisper-api:
+    build: *whisper-build
+    image: proef-sv/whisper
+    user: "1000:1000"
+    command: ["python", "transcribe.py", "--server"]
+    environment:
+      WHISPER_API_MODEL: "small"      # tiny/base zijn sneller en passen in de browser
+    volumes: *data
+
+  klanken-api:
+    build: { context: ./proef, dockerfile: klanken/Dockerfile }
+    image: proef-sv/klanken
+    user: "1000:1000"
+    command: ["python", "klanken.py", "--server"]
+    volumes: *data
+
+  mfa-api:
+    build: { context: ./proef, dockerfile: mfa/Dockerfile }
+    image: proef-sv/mfa
+    user: "1000:1000"
+    command: ["python", "api.py"]
+    shm_size: "1gb"                   # PostgreSQL in de container
+    volumes: *data
+
+  # ---------- batch (alleen met 'docker compose run') ----------
+  piper:
+    build: { context: ./proef, dockerfile: piper/Dockerfile }
+    image: proef-sv/piper
+    user: "1000:1000"
+    volumes: *data
+    profiles: [batch]
+
+  prep:
+    build: { context: ./proef, dockerfile: prep/Dockerfile }
+    image: proef-sv/prep
+    user: "1000:1000"
+    volumes: *data
+    profiles: [batch]
+
+  whisper:
+    build: *whisper-build
+    image: proef-sv/whisper
+    user: "1000:1000"
+    volumes: *data
+    profiles: [batch]
+
+  mfa:
+    build: { context: ./proef, dockerfile: mfa/Dockerfile }
+    image: proef-sv/mfa
+    user: "1000:1000"
+    environment:
+      MFA_JOBS: "4"
+    shm_size: "1gb"
+    volumes: *data
+    profiles: [batch]
+
+  klanken:
+    build: { context: ./proef, dockerfile: klanken/Dockerfile }
+    image: proef-sv/klanken
+    user: "1000:1000"
+    volumes: *data
+    profiles: [batch]
+
+  prosodie:
+    build: { context: ./proef, dockerfile: prosodie/Dockerfile }
+    image: proef-sv/prosodie
+    user: "1000:1000"
+    volumes: *data
+    profiles: [batch]
+
+  verslag:
+    build: { context: ./proef, dockerfile: verslag/Dockerfile }
+    image: proef-sv/verslag
+    user: "1000:1000"
+    volumes: *data
+    profiles: [batch]

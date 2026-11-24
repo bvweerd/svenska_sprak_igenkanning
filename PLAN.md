@@ -43,18 +43,32 @@ de foutvarianten (deel D van de testzinnen).
 
 ## Opzet
 
-Eén map `proef/` met per kandidaat een Dockerfile en een script dat de map `opnames/` verwerkt en een CSV
-schrijft naar `resultaten/`. Alles draait op de CPU (deze machine: 4 kernen, 15 GB; jouw pc is ook goed).
+Alles staat klaar in `docker-compose.yml` en `proef/` (bouwen op de pc; zie README). Twee manieren:
 
-| Stap | Wat | Uitkomst |
-|---|---|---|
-| 0 | **Jij neemt op**: `testzinnen.tsv`, zie „Opnemen” hieronder | `opnames/*.wav` |
-| 1 | Referentie: dezelfde zinnen met Piper | `opnames/piper/*.wav` |
-| 2 | KB-Whisper tiny, base, small | tekst per opname, woordfoutpercentage (WER), tijd per opname |
-| 3 | MFA align met `swedish_mfa` | TextGrids (woord- en klankgrenzen), `alignment_analysis.csv` |
-| 4 | Klankherkenner + `espeak-ng` | herkende vs. verwachte IPA, afstand per woord |
-| 5 | parselmouth op de MFA-grenzen | klinkerduur (lang/kort), F0-vorm (accent 1/2) |
-| 6 | Verslag | tabel: per foutvariant gevonden ja/nee per kandidaat; conclusie voor de eigenaar |
+- **Testpagina** (`docker compose up --build`, http://localhost:8080): zin kiezen, opnemen, en binnen
+  enkele seconden feedback van de drie analyses. Elke opname komt in `opnames/<id>`.
+- **Batch** (`./proef/alles.sh`): alle opnames door alle modellen, met `resultaten/verslag.md`.
+
+| Stap | Map | Wat | Uitkomst |
+|---|---|---|---|
+| 0 | `web/` | Jij neemt op (testpagina, of losse bestanden in `opnames/`) | `opnames/<id>.*` |
+| 1 | `piper/` | Referentie: zinnen A–C met de Piper-stem | `werk/piper_ruw/` |
+| 2 | `prep/` | Omzetten naar 16 kHz mono + `.lab` met de verwachte zin | `werk/corpus/<spreker>/` |
+| 3 | `whisper/` | KB-Whisper tiny, base, small | `resultaten/whisper.csv` |
+| 4 | `mfa/` | MFA align met `swedish_mfa`, gewoon en met `varianten.tsv` | TextGrids, `mfa_standaard.csv` |
+| 5 | `klanken/` | Twee klankherkenners, vergeleken met de woordenboekuitspraak | `resultaten/klanken.csv` |
+| 6 | `prosodie/` | Keuze-uitspraak, klinkerduur, toonhoogte (toppen) | `mfa_keuze.csv`, `prosodie_*.csv` |
+| 7 | `verslag/` | Alles samen, met de criteria hieronder | `resultaten/verslag.md` |
+
+**Keuze-uitspraak** (`proef/mfa/varianten.tsv`): het Zweedse MFA-woordenboek gebruikt hetzelfde
+klankenstelsel als het model en markeert woordaccent 2 (`tanken` → `t̪ʰ a˧˩ ŋ k ɛ˥˩ n̪`). Per doelwoord
+staan er een goede en een of meer foute uitspraken in (sj als *ɕ*, korte/lange *a*, harde *k*, accent 1/2).
+MFA kiest de best passende. Zo wordt uitlijnen een oordeel per klank dat de app zelf kan geven. Of het
+akoestische model het accentverschil hoort, is een van de vragen.
+
+Al gezien bij het voorbereiden: `kb-whisper-tiny` verstaat de Piper-stem slecht (WER ±35% op deel C,
+„sju” → „huvud”). Daarom gebruikt de testpagina standaard `small`. Het espeak-klankmodel kent geen *ɧ*
+(sj-klank), het Zweedse klankmodel wel (als `sx`).
 
 ## Wanneer is de proef geslaagd?
 

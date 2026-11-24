@@ -1,0 +1,23 @@
+# Keuze-uitspraak: MFA mag per woord kiezen uit deze uitspraken en kiest de best passende.
+# Een gekozen 'fout'-variant bij een goede opname = onterecht afgekeurd; bij een D-opname = fout gevonden.
+# Alleen klanken uit het swedish_mfa-klankenstelsel (zie mfa/README in PLAN.md). ˧˩ … ˥˩ = woordaccent 2.
+# woord	label	uitspraak	toelichting
+sju	goed	ɧ ʉː	sj-klank + Zweedse u
+sju	fout	ɕ uː	Nederlandse 'sjoe' (dichtstbijzijnde: tj-klank + oe)
+sju	fout	ʂ uː	Nederlandse 'sjoe' (andere benadering)
+tack	goed	t̪ʰ a k	korte a
+tack	fout	t̪ʰ ɑː k	lange a ('taak'), = tak
+glas	goed	ɡ l̪ ɑː s̪	lange a
+glas	fout	ɡ l̪ a s̪	korte a, = glass
+hus	goed	h ʉː s̪	Zweedse lange u
+hus	fout	h ʏ s̪	Nederlandse u als in 'bus'
+kök	goed	ɕ øː k	zachte k (tj-klank)
+kök	fout	kʰ øː k	harde k
+tanken	accent2	t̪ʰ a˧˩ ŋ k ɛ˥˩ n̪	de gedachte (accent 2)
+tanken	accent1	t̪ʰ a ŋ k ɛ n̪	de tank (accent 1)
+anden	accent1	a n̪ d̪ ɛ n̪	de eend (accent 1)
+anden	accent2	a˧˩ n̪ d̪ ɛ˥˩ n̪	de geest (accent 2)
+skiner	goed	ɧ iː n̪ ɛ r	zachte sk
+skiner	fout	s̪ k iː n̪ ɛ r	harde sk
+stjärnor	goed	ɧ ɛː r n̪ ʊ r	stj = sj-klank
+stjärnor	fout	s̪ t̪ j ɛː r n̪ ʊ r	s-t-j los

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proef uitspraak</title>
+<style>
+  :root { color-scheme: light dark; --goed: #1a7f37; --fout: #c62828; --rand: #8884; --zacht: #8889; }
+  body { font: 16px/1.45 system-ui, sans-serif; margin: 0 auto; max-width: 40rem; padding: 1rem; }
+  h1 { font-size: 1.1rem; margin: 0 0 .75rem; }
+  select, button { font: inherit; padding: .45rem .7rem; border-radius: .4rem; border: 1px solid var(--rand); }
+  button { cursor: pointer; background: Canvas; color: CanvasText; }
+  button.hoofd { background: #2463eb; color: #fff; border-color: #2463eb; }
+  button.opname { background: var(--fout); border-color: var(--fout); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .rij { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: .75rem 0; }
+  #kiezer { flex: 1; min-width: 0; }
+  .kaart { border: 1px solid var(--rand); border-radius: .6rem; padding: 1rem; margin: .75rem 0; }
+  #zweeds { font-size: 1.6rem; font-weight: 600; }
+  #nederlands, .klein { color: var(--zacht); }
+  #opdracht.fout { color: var(--fout); font-weight: 600; }
+  audio { width: 100%; margin-top: .5rem; }
+  #status { min-height: 1.4em; color: var(--zacht); }
+  #oordeel { font-size: 1.2rem; font-weight: 700; }
+  #oordeel.goed { color: var(--goed); } #oordeel.fout { color: var(--fout); }
+  ul { padding-left: 0; list-style: none; margin: .5rem 0 0; }
+  li { padding: .3rem 0; border-top: 1px solid var(--rand); }
+  li::before { display: inline-block; width: 1.4em; font-weight: 700; }
+  li.goed::before { content: "✓"; color: var(--goed); }
+  li.fout::before { content: "✗"; color: var(--fout); }
+  li.info::before { content: "ℹ"; color: var(--zacht); }
+  .bron { font-size: .8rem; color: var(--zacht); margin-left: .3rem; }
+  pre { font-size: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+  #api span { margin-right: .6rem; }
+</style>
+</head>
+<body>
+<h1>Proef uitspraak Zweeds</h1>
+<div class="klein" id="api">Analyses: …</div>
+
+<div class="rij">
+  <button id="vorige" aria-label="Vorige">‹</button>
+  <select id="kiezer" aria-label="Kies een zin"></select>
+  <button id="volgende" aria-label="Volgende">›</button>
+</div>
+
+<div class="kaart">
+  <div id="zweeds">…</div>
+  <div id="nederlands"></div>
+  <div class="klein" id="meten"></div>
+  <p id="opdracht"></p>
+  <div class="rij">
+    <button id="opnemen" class="hoofd">⏺ Opnemen</button>
+    <button id="voorbeeld" title="Computerstem van de browser">🔊 Voorbeeld</button>
+  </div>
+  <audio id="speler" controls hidden></audio>
+  <div id="status"></div>
+</div>
+
+<div class="kaart" id="uitslag" hidden>
+  <div id="oordeel"></div>
+  <ul id="lijst"></ul>
+  <details><summary class="klein">Ruwe resultaten</summary><pre id="ruw"></pre></details>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let zinnen = [], plek = 0, recorder = null, stukken = [];
+
+async function laad() {
+  zinnen = await (await fetch("/api/zinnen")).json();
+  const hash = location.hash.slice(1).toUpperCase();
+  const i = zinnen.findIndex((z) => z.id === hash);
+  plek = i >= 0 ? i : Math.max(0, zinnen.findIndex((z) => !z.opgenomen));
+  vulKiezer(); toon();
+  const st = await (await fetch("/api/status")).json();
+  $("api").innerHTML = "Analyses: " + Object.entries(st)
+    .map(([n, ok]) => `<span>${ok ? "🟢" : "🔴"} ${n}</span>`).join("");
+}
+
+function vulKiezer() {
+  $("kiezer").innerHTML = zinnen.map((z, i) =>
+    `<option value="${i}">${z.opgenomen ? "● " : "○ "}${z.id} – ${z.zweeds}</option>`).join("");
+  $("kiezer").value = plek;
+}
+
+function toon() {
+  const z = zinnen[plek];
+  location.hash = z.id;
+  $("kiezer").value = plek;
+  $("zweeds").textContent = z.zweeds;
+  $("nederlands").textContent = z.nederlands;
+  $("meten").textContent = "Meet: " + z.wat_meten;
+  const fout = z.opdracht.startsWith("FOUT");
+  $("opdracht").textContent = fout ? z.opdracht : "Spreek het zo goed mogelijk uit.";
+  $("opdracht").className = fout ? "fout" : "";
+  $("speler").hidden = true; $("uitslag").hidden = true; $("status").textContent = "";
+}
+
+$("kiezer").onchange = (e) => { plek = +e.target.value; toon(); };
+$("vorige").onclick = () => { plek = (plek + zinnen.length - 1) % zinnen.length; toon(); };
+$("volgende").onclick = () => { plek = (plek + 1) % zinnen.length; toon(); };
+
+$("voorbeeld").onclick = () => {
+  const u = new SpeechSynthesisUtterance(zinnen[plek].zweeds);
+  u.lang = "sv-SE";
+  const stem = speechSynthesis.getVoices().find((v) => v.lang.replace("_", "-").startsWith("sv"));
+  if (stem) u.voice = stem;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+};
+
+function mimeType() {
+  for (const t of ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"])
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  return "";
+}
+
+$("opnemen").onclick = async () => {
+  if (recorder && recorder.state === "recording") { recorder.stop(); return; }
+  try {
+    // Geen ruisonderdrukking of automatische versterking: die vervormen de klanken.
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const type = mimeType();
+    recorder = new MediaRecorder(stream, type ? { mimeType: type } : {});
+    stukken = [];
+    recorder.ondataavailable = (e) => e.data.size && stukken.push(e.data);
+    recorder.onstop = () => { stream.getTracks().forEach((t) => t.stop()); verstuur(); };
+    recorder.start();
+    $("opnemen").textContent = "⏹ Stop"; $("opnemen").className = "opname";
+    $("status").textContent = "Opnemen… wacht even, spreek, wacht even, druk op Stop.";
+    $("uitslag").hidden = true;
+  } catch (e) {
+    $("status").textContent = "Geen microfoon: " + e.message +
+      " (open de pagina via http://localhost:8080 of https)";
+  }
+};
+
+async function verstuur() {
+  $("opnemen").textContent = "⏺ Opnemen"; $("opnemen").className = "hoofd";
+  const blob = new Blob(stukken, { type: recorder.mimeType || "audio/webm" });
+  $("speler").src = URL.createObjectURL(blob); $("speler").hidden = false;
+  const z = zinnen[plek];
+  $("status").textContent = "Analyseren… (MFA kan even duren)";
+  $("opnemen").disabled = true;
+  try {
+    const resp = await fetch("/api/opname?id=" + z.id, {
+      method: "POST", headers: { "Content-Type": blob.type }, body: blob });
+    const uit = await resp.json();
+    if (!resp.ok) throw new Error(uit.fout || resp.status);
+    toonUitslag(uit);
+    z.opgenomen = true; vulKiezer();
+    $("status").textContent = `Klaar in ${uit.sec} s. Opgeslagen als opnames/${z.id}.`;
+  } catch (e) {
+    $("status").textContent = "Mislukt: " + e.message;
+  } finally {
+    $("opnemen").disabled = false;
+  }
+}
+
+function toonUitslag(uit) {
+  const tekst = { goed: "Goed", fout: "Nog niet goed", onbekend: "Geen oordeel" };
+  $("oordeel").textContent = tekst[uit.oordeel];
+  $("oordeel").className = uit.oordeel;
+  $("lijst").innerHTML = "";
+  for (const r of uit.feedback) {
+    const li = document.createElement("li");
+    li.className = r.soort;
+    li.textContent = r.tekst;
+    const b = document.createElement("span");
+    b.className = "bron"; b.textContent = r.bron;
+    li.append(b);
+    $("lijst").append(li);
+  }
+  $("ruw").textContent = JSON.stringify(uit.resultaten, null, 1);
+  $("uitslag").hidden = false;
+}
+
+laad();
+</script>
+</body>
+</html>
