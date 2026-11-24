@@ -43,6 +43,39 @@ Of stap voor stap (zie de kop van `docker-compose.yml`), bv. `docker compose run
 CSV's en `resultaten/verslag.md`. Opnames kunnen ook als losse bestanden in `opnames/` (WAV, m4a, mp3, webm…,
 naam = id, bv. `A01.m4a`); een tweede spreker in `opnames/<naam>/`.
 
+### Moedertaalsprekers: wordt een Zweed onterecht afgekeurd?
+
+Fragmenten van echte Zweden komen in `opnames/extern/<bron>/` (audio + `.txt` met de tekst) en lopen
+daarna gewoon mee in de batch; het verslag krijgt een deel „Moedertaalsprekers”. Het script kiest
+fragmenten met de doelwoorden uit `proef/mfa/varianten.tsv` (één fragment per spreker, vaste seed) en
+schrijft herkomst en licentie in `_bronnen.tsv`. Downloads pak je uit in `bronnen/` (niet in git).
+
+**Common Voice** (CC0, de hoofdbron): maak een gratis account op Mozilla Data Collective, download
+„Common Voice Scripted Speech – Swedish” en pak het uit in `bronnen/commonvoice/`.
+
+```bash
+docker compose run --rm extern commonvoice /bronnen/commonvoice --per-woord 5
+```
+
+Het MFA-model is deels op oudere Common Voice getraind. Heb je ook een oude release (bv. v8), dan sluit
+`--uitsluiten /bronnen/cv8/sv-SE/validated.tsv` die fragmenten uit.
+
+**Lingua Libre / Wikimedia Commons** (losse woorden, licentie per bestand, meestal CC BY-SA): weinig
+materiaal; bij het voorbereiden gevonden: *sju* en *tack*.
+
+```bash
+docker compose run --rm extern lingualibre
+```
+
+**Andere sets** (FLEURS `sv_se`, NST, eigen materiaal): alles met een tabel pad/tekst. FLEURS bijvoorbeeld:
+
+```bash
+docker compose run --rm extern tsv /bronnen/fleurs/sv_se/test.tsv fleurs --geen-kop --pad-kolom 1 --tekst-kolom 2 --audiomap /bronnen/fleurs/sv_se/audio/test --licentie CC-BY-4.0
+```
+
+Woorden die niet in het MFA-woordenboek staan, krijgen een uitspraak van het Zweedse G2P-model.
+Daarna `./proef/alles.sh --zonder-piper` (of de stappen vanaf `prep`).
+
 ## Mappen
 
 | Map | Inhoud |
@@ -50,7 +83,8 @@ naam = id, bv. `A01.m4a`); een tweede spreker in `opnames/<naam>/`.
 | `proef/common/` | gedeelde code (paden, normaliseren, foutpercentage, kleine API) |
 | `proef/<stap>/` | Dockerfile en script per stap: `piper`, `prep`, `whisper`, `mfa`, `klanken`, `prosodie`, `verslag`, `web` |
 | `proef/mfa/varianten.tsv` | goede en foute uitspraken per doelwoord (aanpassen en opnieuw bouwen) |
-| `opnames/` | jouw opnames |
+| `opnames/` | jouw opnames; `opnames/extern/` fragmenten van moedertaalsprekers |
+| `bronnen/` | uitgepakte downloads (Common Voice, FLEURS …), niet in git |
 | `werk/` | tussenbestanden (niet in git) |
 | `resultaten/` | CSV's en verslag |
 
@@ -58,6 +92,8 @@ naam = id, bv. `A01.m4a`); een tweede spreker in `opnames/<naam>/`.
 
 Zonder Docker getest in een Python-omgeving: `prep`, `piper`, `whisper` (met `kb-whisper-tiny`), de
 webpagina met de Whisper-API (opnemen met een nagebootste microfoon, telefoonformaat, licht en donker), en
-`prosodie` en `verslag` op nagemaakte TextGrids. **Niet getest**: de Docker-builds, MFA (`mfa/align.sh`,
-`mfa/api.py`) en de klankherkenners (`klanken/`). Loopt daar iets mis bij het bouwen of draaien, stuur de
+`prosodie` en `verslag` op nagemaakte TextGrids, en `extern commonvoice` met een nagemaakte
+Common Voice-map. `extern lingualibre` vond de bestanden, maar Wikimedia weigerde het downloaden vanuit de
+cloudomgeving (te veel verzoeken); op een gewone pc hoort dat te werken. **Niet getest**: de Docker-builds, MFA (`mfa/align.sh`,
+`mfa/api.py`, G2P) en de klankherkenners (`klanken/`). Loopt daar iets mis bij het bouwen of draaien, stuur de
 foutmelding.

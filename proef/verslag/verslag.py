@@ -66,6 +66,8 @@ def main():
     if kz:
         rijen, goed_fout, d_gevonden = [], [0, 0], [0, 0]
         for r in kz:
+            if r["spreker"].startswith("extern-"):
+                continue  # zie deel 4
             vl = verwacht_label(r["id"])
             klopt = r["gekozen"] == vl
             rijen.append([r["spreker"], r["id"], r["woord"], vl, r["gekozen"], r["klanken"],
@@ -153,7 +155,39 @@ def main():
     if not kv and not pw:
         out.append("_Geen resultaten (prosodie_*.csv ontbreken)._\n")
 
-    out.append("\n## Criteria (uit PLAN.md)\n\n\n")
+    # 4. Moedertaalsprekers (opnames/extern/)
+    out.append("\n## 4. Moedertaalsprekers — onterecht afgekeurd?\n\n")
+    ext_bronnen = sorted({r["spreker"] for r in wh + kz + kl if r.get("spreker", "").startswith("extern-")})
+    if ext_bronnen:
+        rijen = []
+        for bron in ext_bronnen:
+            w = [r for r in wh if r["spreker"] == bron]
+            k = [r for r in kz if r["spreker"] == bron and r["woord"] not in ("anden", "tanken")]
+            fout = [r for r in k if r["gekozen"] != "goed"]
+            p_ = [r for r in kl if r["spreker"] == bron and r["model"] == "xlsr300m-sv"]
+            modellen = sorted({r["model"] for r in w})
+            rijen.append([bron.removeprefix("extern-"), len({r["id"] for r in w + k + p_}),
+                          "; ".join(f"{m}: {gem(r['wer_verwacht'] for r in w if r['model'] == m)}"
+                                    for m in modellen) or "–",
+                          f"{len(fout)}/{len(k)}" if k else "–",
+                          gem(r["per"] for r in p_)])
+            if k:
+                criteria.append((f"Moedertaal ({bron.removeprefix('extern-')}): onterecht afgekeurd ≤ 10%",
+                                 f"{len(fout)}/{len(k)}", "ja" if len(fout) / len(k) <= 0.1 else "nee"))
+        out.append(tabel(["bron", "fragmenten", "WER per model", "MFA: doelwoord afgekeurd", "PER xlsr300m-sv"],
+                         rijen))
+        afgekeurd = [r for r in kz if r["spreker"].startswith("extern-") and r["gekozen"] != "goed"
+                     and r["woord"] not in ("anden", "tanken")]
+        if afgekeurd:
+            out.append("\nOnterecht afgekeurde doelwoorden (luister deze na: klopt de opname, of het model niet?):\n\n")
+            out.append(tabel(["bron", "fragment", "woord", "gekozen", "klanken"],
+                             [[r["spreker"].removeprefix("extern-"), r["id"], r["woord"], r["gekozen"], r["klanken"]]
+                              for r in afgekeurd]))
+        out.append("\nWER is bij losse woorden (Lingua Libre) streng: één fout woord = 100%.\n")
+    else:
+        out.append("_Geen externe opnames (opnames/extern/)._\n")
+
+    out.append("\n## Criteria (uit PLAN.md)\n\n")
     out.append(tabel(["criterium", "waarde", "gehaald"], criteria) if criteria else "_Nog niets te beoordelen._\n")
     out.append("\nLengte- en melodiecriteria (≥ 80% juist onderscheiden) beoordeel je uit de tabellen in deel 3.\n")
 

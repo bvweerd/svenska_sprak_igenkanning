@@ -13,7 +13,7 @@ import numpy as np
 import parselmouth
 from praatio import textgrid
 
-from proef_common import MFA_UIT, RESULTATEN, bewerkingen, opnames, schrijf_csv, zinnen
+from proef_common import MFA_UIT, RESULTATEN, bewerkingen, opnames, schrijf_csv, zin_voor, zinnen
 
 VARIANTEN = Path(os.environ.get("VARIANTEN", "/app/varianten.tsv"))
 KLINKER = re.compile(r"[aeiouyåäöɑɛɪʏʉɵœøæɔʊ]")
@@ -132,7 +132,7 @@ def main():
     medianen = {}
     for spreker, zin_id, wav in opnames():
         k, w, kl, stem = analyseer_opname(
-            spreker, zin_id, rijen_tsv[zin_id]["deel"][0], wav,
+            spreker, zin_id, zin_voor(spreker, zin_id, rijen_tsv)["deel"][0], wav,
             MFA_UIT / "standaard" / spreker / f"{zin_id}.TextGrid",
             MFA_UIT / "varianten" / spreker / f"{zin_id}.TextGrid", var)
         keuze += k

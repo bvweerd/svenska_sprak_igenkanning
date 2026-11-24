@@ -70,6 +70,11 @@ Al gezien bij het voorbereiden: `kb-whisper-tiny` verstaat de Piper-stem slecht 
 „sju” → „huvud”). Daarom gebruikt de testpagina standaard `small`. Het espeak-klankmodel kent geen *ɧ*
 (sj-klank), het Zweedse klankmodel wel (als `sx`).
 
+**Moedertaalsprekers** (`proef/extern/`, `opnames/extern/`): fragmenten van echte Zweden met de
+doelwoorden, vooral uit Common Voice (CC0). Ze meten het belangrijkste risico, onterecht afkeuren, en
+laten zien hoe de controle omgaat met accenten en dialecten. Foutvarianten (deel D) blijven eigen opnames:
+een moedertaalspreker maakt geen Nederlandse fouten.
+
 ## Wanneer is de proef geslaagd?
 
 Klein aantal opnames, dus indicatief. Per vraag:
@@ -77,6 +82,7 @@ Klein aantal opnames, dus indicatief. Per vraag:
 - **Vraag 1 (wat)**: WER ≤ 10% op de goede opnames van deel C met een model dat in de browser past (tiny/base).
 - **Vraag 2 (hoe)**: ≥ 8 van de 10 bewuste klankfouten (D01–D10) gevonden, en ≤ 1 op 10 goede opnames
   onterecht afgekeurd. Onterecht afkeuren is het ergste: dat frustreert en ondermijnt „de app kijkt na”.
+- **Moedertaalsprekers**: ≤ 10% van de doelwoorden onterecht afgekeurd.
 - **Vraag 3 (melodie)**: lang/kort-paren (B) en accentparen (A) in ≥ 80% juist onderscheiden.
 
 Daarnaast: tijd per opname < 3 s, en welk deel offline in de browser kan.

@@ -15,7 +15,7 @@ import wave
 import numpy as np
 from faster_whisper import WhisperModel
 
-from proef_common import RESULTATEN, foutpercentage, normaliseer, opnames, schrijf_csv, serveer, zinnen
+from proef_common import RESULTATEN, foutpercentage, normaliseer, opnames, schrijf_csv, serveer, zin_voor, zinnen
 
 MODELLEN = os.environ.get("WHISPER_MODELLEN", "tiny base small").split()
 MAP = os.environ.get("WHISPER_MAP", "/modellen")
@@ -67,7 +67,7 @@ def main():
     for maat in MODELLEN:
         model = laad(maat)
         for spreker, zin_id, wav in opnames():
-            rij = analyseer(model, maat, spreker, zin_id, wav, rijen_tsv[zin_id])
+            rij = analyseer(model, maat, spreker, zin_id, wav, zin_voor(spreker, zin_id, rijen_tsv))
             uit.append(rij)
             print(f"{maat:6} {spreker:6} {zin_id}  {rij['herkend']}", flush=True)
     schrijf_csv(RESULTATEN / "whisper.csv", uit, list(uit[0]) if uit else ["model"])

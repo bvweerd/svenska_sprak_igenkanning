@@ -21,6 +21,20 @@ def zinnen():
         return {r["id"]: r for r in csv.DictReader(f, delimiter="\t")}
 
 
+EXTERN = "extern-"   # sprekermap in het corpus voor opnames van moedertaalsprekers
+
+
+def zin_voor(spreker, zin_id, rijen):
+    """De rij voor een opname. Externe fragmenten staan niet in testzinnen.tsv: dan komt de
+    tekst uit de .lab die prep schreef, met deel 'E'."""
+    if not spreker.startswith(EXTERN) and zin_id in rijen:
+        return rijen[zin_id]
+    lab = CORPUS / spreker / f"{zin_id}.lab"
+    tekst = lab.read_text(encoding="utf-8").strip() if lab.exists() else ""
+    return {"id": zin_id, "deel": "E extern", "zweeds": tekst, "gezegd": "", "goed_id": "",
+            "nederlands": "", "wat_meten": "", "opdracht": ""}
+
+
 def opnames():
     """Alle voorbereide opnames: lijst van (spreker, id, wav-pad)."""
     uit = []

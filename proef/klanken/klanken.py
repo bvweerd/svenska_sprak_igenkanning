@@ -20,7 +20,7 @@ import soundfile as sf
 import torch
 from transformers import AutoProcessor, Wav2Vec2ForCTC
 
-from proef_common import RESULTATEN, foutpercentage, normaliseer, opnames, ops_tekst, schrijf_csv, serveer, zinnen, bewerkingen
+from proef_common import RESULTATEN, foutpercentage, normaliseer, opnames, ops_tekst, schrijf_csv, serveer, zin_voor, zinnen, bewerkingen
 
 MODELLEN = {
     "xlsr53-espeak": "/modellen/wav2vec2-xlsr-53-espeak-cv-ft",
@@ -108,7 +108,7 @@ def main():
     uit = []
     for naam, (model, processor) in laad_alle().items():
         for spreker, zin_id, wav in opnames():
-            rij = analyseer(naam, model, processor, wb, spreker, zin_id, wav, rijen_tsv[zin_id])
+            rij = analyseer(naam, model, processor, wb, spreker, zin_id, wav, zin_voor(spreker, zin_id, rijen_tsv))
             uit.append(rij)
             print(f"{naam:14} {spreker:6} {zin_id}  {rij['herkend']}   [{rij['verschillen']}]", flush=True)
     schrijf_csv(RESULTATEN / "klanken.csv", uit, list(uit[0]) if uit else ["model"])

@@ -65,6 +65,18 @@ services:
     volumes: *data
 
   # ---------- batch (alleen met 'docker compose run') ----------
+  # Moedertaalsprekers klaarzetten in opnames/extern/ (zie README), bv.:
+  #   docker compose run --rm extern lingualibre
+  #   docker compose run --rm extern commonvoice /bronnen/commonvoice
+  extern:
+    build: { context: ./proef, dockerfile: extern/Dockerfile }
+    image: proef-sv/extern
+    user: "1000:1000"
+    volumes:
+      - ./bronnen:/bronnen:ro         # hier pak je downloads uit (Common Voice, FLEURS, NST)
+      - ./opnames:/data/opnames
+    profiles: [batch]
+
   piper:
     build: { context: ./proef, dockerfile: piper/Dockerfile }
     image: proef-sv/piper

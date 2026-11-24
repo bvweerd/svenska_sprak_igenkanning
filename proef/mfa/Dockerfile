@@ -11,6 +11,7 @@ USER mfa
 # Modellen bij het bouwen ophalen: daarna werkt de proef offline.
 RUN mfa model download acoustic swedish_mfa \
     && mfa model download dictionary swedish_mfa \
+    && mfa model download g2p swedish_mfa \
     && mfa server init
 WORKDIR /app
 # api.py (webpagina) gebruikt dezelfde analyse als de batchstap 'prosodie'.
