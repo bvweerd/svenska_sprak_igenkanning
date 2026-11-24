@@ -1,0 +1,40 @@
+id	deel	zweeds	nederlands	wat_meten	opdracht
+A01	A accent	anden	de eend	accent 1 (and)	goed uitspreken
+A02	A accent	anden	de geest	accent 2 (ande)	goed uitspreken
+A03	A accent	tanken	de tank	accent 1 (tank)	goed uitspreken
+A04	A accent	tanken	de gedachte	accent 2 (tanke)	goed uitspreken
+B01	B lengte	glas	glas	lange a	goed uitspreken
+B02	B lengte	glass	ijs	korte a + lange s	goed uitspreken
+B03	B lengte	tak	dak	lange a	goed uitspreken
+B04	B lengte	tack	bedankt	korte a + lange k	goed uitspreken
+B05	B lengte	vit	wit	lange i	goed uitspreken
+B06	B lengte	vitt	wit (ett-vorm)	korte i + lange t	goed uitspreken
+B07	B klank	sju	zeven	sj-klank, u	goed uitspreken
+B08	B klank	tjugo	twintig	tj-klank	goed uitspreken
+B09	B klank	kök	keuken	zachte k (tj-klank)	goed uitspreken
+B10	B klank	skjorta	overhemd	sj-klank (skj)	goed uitspreken
+B11	B klank	hus	huis	Zweedse u	goed uitspreken
+B12	B klank	ny	nieuw	Zweedse y	goed uitspreken
+B13	B klank	sol	zon	lange o (oe-klank)	goed uitspreken
+C01	C zin	Jag heter Anna och jag bor i Malmö.	Ik heet Anna en ik woon in Malmö.	basiszin	goed uitspreken
+C02	C zin	Hon kommer från Nederländerna.	Ze komt uit Nederland.	lang woord, ä	goed uitspreken
+C03	C zin	Klockan sju äter vi frukost.	Om zeven uur ontbijten we.	V2 (inversie), sj	goed uitspreken
+C04	C zin	Jag förstår inte.	Ik begrijp het niet.	kort, ontkenning	goed uitspreken
+C05	C zin	Kan du prata lite långsammare?	Kun je wat langzamer praten?	vraag, ng	goed uitspreken
+C06	C zin	Var ligger stationen?	Waar is het station?	tion-uitspraak	goed uitspreken
+C07	C zin	Jag vill ha en kopp kaffe, tack.	Ik wil graag een kop koffie, alsjeblieft.	korte klinkers	goed uitspreken
+C08	C zin	Det är kallt i dag, men solen skiner.	Het is koud vandaag, maar de zon schijnt.	zachte sk (skiner)	goed uitspreken
+C09	C zin	Barnen leker i parken.	De kinderen spelen in het park.	accent 2 (barnen) en 1 (parken)	goed uitspreken
+C10	C zin	Sjuksköterskan tjänar ganska bra.	De verpleegkundige verdient vrij goed.	sj, tj, zachte sk	goed uitspreken
+C11	C zin	Det finns tjugosju stjärnor på himlen.	Er staan zevenentwintig sterren aan de hemel.	tj, sj, stj	goed uitspreken
+C12	C zin	Huset är gult och fönstren är stora.	Het huis is geel en de ramen zijn groot.	u, ö	goed uitspreken
+D01	D fout	sju	zeven	sj als Nederlandse sj, u als oe	FOUT: zeg ‘sjoe’ zoals in het Nederlands
+D02	D fout	tack	bedankt	lange a	FOUT: zeg ‘taak’ (lange a)
+D03	D fout	glas	glas	korte a	FOUT: zeg het kort, zoals Nederlands ‘glas’
+D04	D fout	hus	huis	Nederlandse u	FOUT: zeg ‘hus’ met de Nederlandse u (als in ‘bus’)
+D05	D fout	kök	keuken	harde k	FOUT: zeg ‘keuk’ met harde k aan het begin
+D06	D fout	tanken	de gedachte	accent 1 i.p.v. 2	FOUT: zeg het met de melodie van A03 (de tank)
+D07	D fout	Jag förstår inte.	Ik begrijp het niet.	woord weggelaten	FOUT: zeg alleen ‘Jag förstår.’
+D08	D fout	Klockan sju äter vi frukost.	Om zeven uur ontbijten we.	V2-fout	FOUT: zeg ‘Klockan sju vi äter frukost.’
+D09	D fout	Det finns tjugosju stjärnor på himlen.	Er staan zevenentwintig sterren aan de hemel.	stj letterlijk	FOUT: zeg ‘stjärnor’ met s-t-j los uitgesproken
+D10	D fout	Det är kallt i dag, men solen skiner.	Het is koud vandaag, maar de zon schijnt.	harde sk	FOUT: zeg ‘skiner’ met s-k (zoals ‘ski’ in het Nederlands)
