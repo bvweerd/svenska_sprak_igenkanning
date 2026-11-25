@@ -401,11 +401,11 @@ def oude_analyse(naam, rij, toelichting):
         # Tips altijd opnieuw met de huidige regels (de bewaarde kunnen van een oudere versie zijn).
         d["tips"] = ([] if niets_gehoord(res.get("whisper"), d.get("geluid"))
                      else kies_tips(zin_id, rij, res, toelichting, patronen()))
+        # Woordtijden altijd opnieuw: de voorbeeldstem kan sinds de opname veranderd zijn (Piper → MMS).
         woorden = d.get("woorden") or []
-        if woorden and "eigen" not in woorden[0]:
-            tijden = woordtijden(zin_id, rij, res)
-            if len(tijden) == len(woorden):
-                d["woorden"] = [dict(w, **t) for w, t in zip(woorden, tijden)]
+        tijden = woordtijden(zin_id, rij, res)
+        if woorden and len(tijden) == len(woorden):
+            d["woorden"] = [dict(w, **t) for w, t in zip(woorden, tijden)]
     d["score"] = huidige_score(zin_id, res)
     kop, zin, soort = eindoordeel(d["score"], res.get("whisper"), d.get("tips", []), d.get("geluid"))
     d["eindoordeel"] = {"kop": kop, "zin": zin, "soort": soort}
