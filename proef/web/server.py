@@ -261,6 +261,14 @@ class Handler(BaseHTTPRequestHandler):
             # Je eigen opname (schoongemaakt, 16 kHz): de woordtijden van MFA horen bij dit bestand.
             f = ARCHIEF / m.group(1)
             self._stuur(200, f.read_bytes(), "audio/wav") if f.exists() else self._stuur(404, {"fout": "geen opname"})
+        elif m := re.fullmatch(r"/api/voorbeeldwoord/([^/]+)", pad):
+            # Eén woord, los ingesproken door de voorbeeldstem (alleen letters: geen paden).
+            from urllib.parse import unquote
+            from proef_common import VOORBEELD_WOORDEN
+            w = unquote(m.group(1))
+            f = VOORBEELD_WOORDEN / f"{w}.wav"
+            ok = re.fullmatch(r"\w+", w) and f.exists()
+            self._stuur(200, f.read_bytes(), "audio/wav") if ok else self._stuur(404, {"fout": "geen voorbeeldwoord"})
         elif m := re.fullmatch(r"/api/voorbeeld/([A-Z]\d\d)", pad):
             f = voorbeeld_wav(m.group(1))
             self._stuur(200, f.read_bytes(), "audio/wav") if f else self._stuur(404, {"fout": "geen voorbeeld"})

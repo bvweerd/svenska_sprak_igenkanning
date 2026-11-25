@@ -47,7 +47,10 @@ alleen langs de zinnen te gaan die je nog niet hebt ingesproken. Je krijgt (`pro
   klinkt als a, sj- en tj-klank, Zweedse u en y, o als oe, rs-klank, een „eh” vóór het woord) met een
   concrete instructie in Nederlandse klanken, zonder IPA. Een fout die in je opnames vaker terugkomt, gaat voor.
 - **Luister en vergelijk**: klik op een woord en je hoort eerst jezelf, dan de voorbeeldstem (MMS, zie
-  „Voorbeeldstem”), aan de hand van de woordtijden van MFA. Ook de knop Voorbeeld speelt die stem.
+  „Voorbeeldstem”). Jezelf: het stukje uit je opname volgens de woordtijden van MFA. Voorbeeld: het woord
+  **los** ingesproken (werk/voorbeeld_woorden), want een stukje uit de voorbeeldzin bevat bij korte woorden
+  ook klanken van de buren („på” klonk als „enpoi”). Woorden met een bijzonderheid zijn oranje of rood; de
+  uitleg per woord (wat de klankherkenners hoorden) verschijnt onder de woorden. Ook de knop Voorbeeld speelt die stem.
 - **Waar je aan kunt werken**: de klankfouten die over je laatste opname per zin het vaakst terugkomen (min.
   3 keer), want één klanktip zegt weinig en tien keer dezelfde fout wel.
 - **Eerdere opnames** onder elke zin (datum, oordeel, score; „?” = gemaakt vóór de microfoonkeuze, „test” =

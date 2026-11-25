@@ -70,6 +70,11 @@
   #luisterwoorden button { font: inherit; padding: .05rem .3rem; border: 0; border-bottom: 2px dotted var(--rand);
                            border-radius: .25rem; background: none; color: inherit; }
   #luisterwoorden button.tipwoord { border-bottom: 2px solid #2463eb; }
+  #luisterwoorden button.let_op { border-bottom: 2px solid var(--letop); background: #b4530912; }
+  #luisterwoorden button.fout { border-bottom: 2px solid var(--fout); background: #c6282812; }
+  #luisterwoorden button.tipwoord.let_op, #luisterwoorden button.tipwoord.fout { outline: 1px solid #2463eb66; }
+  #woordinfo { border-left: 3px solid var(--rand); padding: .3rem .6rem; margin-top: .3rem; color: CanvasText; }
+  #woordinfo b { color: CanvasText; }
   #luisterwoorden button.actief, #luisterwoorden button:hover { background: #2463eb22; }
   h2 { font-size: 1rem; margin: 0 0 .4rem; }
   #patronenlijst li::before { content: "•"; color: #2463eb; }
@@ -134,8 +139,10 @@
   <div id="tips"></div>
   <div id="luister" hidden>
     <h2>Luister en vergelijk</h2>
-    <div class="klein">Klik op een woord: eerst hoor je jezelf, dan het voorbeeld.</div>
+    <div class="klein">Klik op een woord: eerst hoor je jezelf, dan het voorbeeld. Oranje en rood: daar viel iets op
+      (de uitleg verschijnt eronder).</div>
     <div id="luisterwoorden"></div>
+    <div id="woordinfo" class="klein" hidden></div>
     <div class="rij">
       <button id="hele-eigen">▶ Jouw opname</button>
       <button id="hele-voorbeeld">▶ Voorbeeld</button>
@@ -411,8 +418,8 @@ async function speel(url, van, tot) {
   if (bron) { try { bron.stop(); } catch (e) {} }
   bron = audioCtx.createBufferSource();
   bron.buffer = b; bron.connect(audioCtx.destination);
-  const start = Math.max(0, (van ?? 0) - 0.03);
-  const duur = tot != null ? Math.min(b.duration - start, tot - start + 0.06) : undefined;
+  const start = Math.max(0, van ?? 0);
+  const duur = tot != null ? Math.min(b.duration - start, tot - start + 0.03) : undefined;
   await new Promise((klaar) => { bron.onended = klaar; bron.start(0, start, duur); });
 }
 
@@ -425,7 +432,9 @@ async function vergelijk(i) {
   try {
     if (w.eigen) await speel(laatste.audio.eigen, ...w.eigen);
     await new Promise((r) => setTimeout(r, 300));
-    if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld);
+    // Voorbeeld: het losse woord van de voorbeeldstem (schoon, zonder buurwoorden); anders het stukje uit de zin.
+    if (w.voorbeeld_woord) await speel(w.voorbeeld_woord);
+    else if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld);
   } finally { knop && knop.classList.remove("actief"); }
 }
 
@@ -468,17 +477,28 @@ function toonLuister(uit) {
   const kan = (uit.woorden || []).some((w) => w.eigen);
   $("luister").hidden = !kan;
   $("luisterwoorden").innerHTML = "";
+  $("woordinfo").hidden = true;
   (uit.woorden || []).forEach((w, i) => {
     const k = document.createElement("button");
     k.textContent = w.tekst;
-    if (tipwoorden.has(i)) k.className = "tipwoord";
-    k.disabled = !w.eigen && !w.voorbeeld;
-    k.onclick = () => vergelijk(i);
+    // Kleur per woord (oranje = let op, rood = fout), dezelfde als onder 'Meer details'; blauw = staat in een tip.
+    k.className = [tipwoorden.has(i) ? "tipwoord" : "", w.status && w.status !== "goed" ? w.status : ""].join(" ").trim();
+    k.disabled = !w.eigen && !w.voorbeeld && !w.voorbeeld_woord;
+    k.onclick = () => { toonWoordinfo(w); vergelijk(i); };
     $("luisterwoorden").append(k, " ");
   });
   $("hele-eigen").onclick = () => speel(uit.audio.eigen);
   $("hele-voorbeeld").hidden = !uit.audio.voorbeeld;
   $("hele-voorbeeld").onclick = () => speel(uit.audio.voorbeeld);
+}
+
+function toonWoordinfo(w) {
+  // Wat er bij dit woord opviel (uitleg per woord); bij een goed woord een korte bevestiging.
+  const naam = w.tekst.replace(/[.,!?;:]+$/, "");
+  $("woordinfo").hidden = false;
+  $("woordinfo").innerHTML = w.uitleg && w.uitleg.length
+    ? `<b>${opmaak(naam)}</b>: ${w.uitleg.map(opmaak).join(" · ")}`
+    : `<b>${opmaak(naam)}</b>: niets opvallends.`;
 }
 
 function toonPatronen(pat) {
