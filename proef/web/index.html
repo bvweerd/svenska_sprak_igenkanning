@@ -69,10 +69,9 @@
   #luisterwoorden { font-size: 1.25rem; line-height: 2; margin: .3rem 0; }
   #luisterwoorden button { font: inherit; padding: .05rem .3rem; border: 0; border-bottom: 2px dotted var(--rand);
                            border-radius: .25rem; background: none; color: inherit; }
-  #luisterwoorden button.tipwoord { border-bottom: 2px solid #2463eb; }
-  #luisterwoorden button.let_op { border-bottom: 2px solid var(--letop); background: #b4530912; }
-  #luisterwoorden button.fout { border-bottom: 2px solid var(--fout); background: #c6282812; }
-  #luisterwoorden button.tipwoord.let_op, #luisterwoorden button.tipwoord.fout { outline: 1px solid #2463eb66; }
+  /* Rood: gevuld en rode letters (hier gaat een tip over). Oranje: alleen een gestippelde lijn (één bron, onzeker). */
+  #luisterwoorden button.fout { border-bottom: 3px solid var(--fout); background: #c6282830; color: var(--fout); font-weight: 600; }
+  #luisterwoorden button.let_op { border-bottom: 2px dashed #e08a00; }
   #woordinfo { border-left: 3px solid var(--rand); padding: .3rem .6rem; margin-top: .3rem; color: CanvasText; }
   #woordinfo b { color: CanvasText; }
   #luisterwoorden button.actief, #luisterwoorden button:hover { background: #2463eb22; }
@@ -139,8 +138,8 @@
   <div id="tips"></div>
   <div id="luister" hidden>
     <h2>Luister en vergelijk</h2>
-    <div class="klein">Klik op een woord: eerst hoor je jezelf, dan het voorbeeld. Rood: daar gaan de tips
-      over. Oranje: daar hoorde één model iets, niet zeker. Klik voor de uitleg.</div>
+    <div class="klein">Klik op een woord: eerst hoor je jezelf, dan het voorbeeld. <b style="color:var(--fout)">Rood</b>: daar gaan de tips
+      over. <span style="border-bottom:2px dashed #e08a00">Oranje gestippeld</span>: daar hoorde één model iets, niet zeker. Klik voor de uitleg.</div>
     <div id="luisterwoorden"></div>
     <div id="woordinfo" class="klein" hidden></div>
     <div class="rij">
