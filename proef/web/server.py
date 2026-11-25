@@ -14,7 +14,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from proef_common import OPNAMES, WERK, bewerkingen, normaliseer, zinnen
+from proef_common import (klank_oordeel, lees_klank_varianten, KLANK_MODELLEN, OPNAMES, SCORE_KLANKEN, WERK, bewerkingen, doel_variant, lees_ijking,
+                          normaliseer, ruwe_score, score_onderdelen, vergelijk, zet_om, zinnen)
 
 API = {
     "whisper": os.environ.get("WHISPER_API", "http://whisper-api:8001"),
@@ -24,8 +25,6 @@ API = {
 HIER = Path(__file__).parent
 EXT = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/mpeg": "mp3",
        "audio/wav": "wav", "audio/x-wav": "wav", "audio/aac": "aac"}
-# Bedoelde uitspraak bij de woorden met woordaccent; overige variantwoorden: 'goed'.
-DOEL_ACCENT = {"A01": "accent1", "A02": "accent2", "A03": "accent1", "A04": "accent2", "D06": "accent2"}
 MELODIEWOORDEN = {"anden", "tanken", "barnen", "parken"}
 LENGTEWOORDEN = {"glas", "glass", "tak", "tack", "vit", "vitt"}
 
@@ -52,6 +51,73 @@ def vraag(naam, wav, zin_id):
         return {"fout": f"{naam}: {e}"}
 
 
+def woord_oordeel(zin_id, r, res):
+    """Per woord van de zin: goed / let op / fout, met uitleg. Combineert drie bronnen:
+    Whisper (is het woord verstaan, hoe zeker), de klankherkenner (welke klanken van dít woord
+    afwijken) en MFA (juiste uitspraakvariant bij de doelwoorden)."""
+    weergave = r["zweeds"].split()
+    # Elk getoond woord (met leestekens) → de genormaliseerde woorden waar het voor staat.
+    norm = [normaliseer(w).split() for w in weergave]
+    verwacht = [w for ws in norm for w in ws]
+    info = [{"fouten": [], "let_op": []} for _ in verwacht]
+
+    wh = res.get("whisper", {})
+    if "herkend" in wh:
+        herkend = normaliseer(wh["herkend"]).split()
+        zeker = []   # zekerheid per genormaliseerd herkend woord (Whisper geeft het per eigen woord)
+        for stuk in str(wh.get("woorden", "")).split():
+            tekst, _, p = stuk.rpartition(":")
+            zeker += [float(p)] * len(normaliseer(tekst).split())
+        if len(zeker) != len(herkend):
+            zeker = [None] * len(herkend)
+        _, ops = bewerkingen(verwacht, herkend)
+        i = j = 0
+        for soort, a, b in ops:
+            if soort == "I":
+                if i < len(info):
+                    info[i]["let_op"].append(f"daarvoor hoorde Whisper nog „{b}”")
+                j += 1
+                continue
+            if soort == "=":
+                p = zeker[j]
+                if p is not None and p < 0.5:
+                    info[i]["let_op"].append(f"Whisper twijfelde (zekerheid {round(100 * p)}%)")
+            elif soort == "S":
+                info[i]["fouten"].append(f"Whisper verstond „{b}”")
+            else:
+                info[i]["fouten"].append("Whisper hoorde dit woord niet")
+            i += 1
+            j += soort != "D"
+
+    kl = res.get("klanken", {}).get(SCORE_KLANKEN, {})
+    var = lees_klank_varianten().get(SCORE_KLANKEN)   # geleerd uit moedertaalsprekers (batch)
+    pw = kl.get("per_woord") or []
+    if len(pw) == len(verwacht):
+        for i, w in enumerate(pw):
+            if w["score"] is None or not w["fouten"]:
+                continue
+            status, tekst = klank_oordeel(w, var)
+            if tekst:
+                (info[i]["fouten"] if status == "fout" else info[i]["let_op"]).append(tekst)
+
+    for k in res.get("mfa", {}).get("keuze", []):
+        doel = doel_variant(zin_id, k["woord"])
+        if k["gekozen"] != doel and k["woord"] in verwacht:
+            i = verwacht.index(k["woord"])
+            uitleg = TOELICHTING.get((k["woord"], k["gekozen"]), k["gekozen"])
+            info[i]["fouten"].append(f"klonk als {uitleg}; bedoeld: {TOELICHTING.get((k['woord'], doel), doel)}")
+
+    uit, i = [], 0
+    for tekst, ws in zip(weergave, norm):
+        delen = info[i:i + len(ws)]
+        i += len(ws)
+        fouten = [x for d in delen for x in d["fouten"]]
+        let_op = [x for d in delen for x in d["let_op"]]
+        uit.append({"tekst": tekst, "status": "fout" if fouten else "let_op" if let_op else "goed",
+                    "uitleg": fouten + let_op})
+    return uit
+
+
 def feedback(zin_id, r, res):
     regels = []
     wh = res.get("whisper", {})
@@ -67,7 +133,7 @@ def feedback(zin_id, r, res):
             regels.append(("fout", "verstaan", f"Verstaan: “{wh['herkend']}” ({verschil})"))
     mfa = res.get("mfa", {})
     for k in mfa.get("keuze", []):
-        doel = DOEL_ACCENT.get(zin_id, "goed") if k["woord"] in ("anden", "tanken") else "goed"
+        doel = doel_variant(zin_id, k["woord"])
         uitleg_doel = TOELICHTING.get((k["woord"], doel), doel)
         if k["gekozen"] == doel:
             regels.append(("goed", "uitspraak", f"{k['woord']}: {uitleg_doel}"))
@@ -136,6 +202,12 @@ class Handler(BaseHTTPRequestHandler):
         if zin_id not in rijen:
             return self._stuur(400, {"fout": f"onbekende id {zin_id}"})
         audio = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        # Welke microfoon de browser gebruikte (naam, kanalen, samplerate, piekniveau): voor controle achteraf.
+        try:
+            from urllib.parse import unquote
+            microfoon = json.loads(unquote(self.headers.get("X-Microfoon", "")) or "{}")
+        except ValueError:
+            microfoon = {}
         if len(audio) < 1000:
             return self._stuur(400, {"fout": "opname is leeg"})
         ext = EXT.get(self.headers.get("Content-Type", "").split(";")[0].strip(), "webm")
@@ -149,16 +221,39 @@ class Handler(BaseHTTPRequestHandler):
         archief.mkdir(parents=True, exist_ok=True)
         bron = archief / f"{zin_id}-{stempel}.{ext}"
         bron.write_bytes(audio)
-        wav = archief / f"{zin_id}-{stempel}.wav"
-        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(bron), "-ac", "1", "-ar", "16000",
-                        "-sample_fmt", "s16", str(wav)], check=True)
+        wav = archief / f"{zin_id}-{stempel}-16k.wav"  # eigen naam: de upload kan zelf een .wav zijn
+        geluid = zet_om(bron, wav)   # 16 kHz mono; plof bij het aanzetten en brom onder 80 Hz eruit
 
         t0 = time.perf_counter()
         with ThreadPoolExecutor(3) as pool:
             taken = {naam: pool.submit(vraag, naam, wav, zin_id) for naam in API}
             res = {naam: t.result() for naam, t in taken.items()}
         oordeel, regels = feedback(zin_id, rijen[zin_id], res)
-        uit = {"id": zin_id, "oordeel": oordeel, "feedback": regels, "resultaten": res,
+        # Score: dezelfde berekening als de batch, vergeleken met de laatste ijking (werk/score_ijking.json).
+        wh, kl, mfa = res.get("whisper", {}), res.get("klanken", {}), res.get("mfa", {})
+        ijking = lees_ijking()
+        modellen = KLANK_MODELLEN
+        onderdelen = score_onderdelen(wh if "fout" not in wh else None,
+                                      {m: kl.get(m) for m in modellen if isinstance(kl.get(m), dict)},
+                                      mfa.get("keuze"), zin_id, native_per=(ijking or {}).get("native_per"))
+        score = {**vergelijk(ruwe_score(onderdelen), ijking),
+                 "onderdelen": {n: round(100 * v) for n, v in onderdelen.items()}}
+        # Opnamekwaliteit: blijft er na het schoonmaken veel brom over, of is het erg zacht, dan zeggen we dat.
+        if geluid["veel_brom"]:
+            regels.insert(0, {"soort": "fout", "bron": "opname",
+                              "tekst": f"Veel laag bromgeluid in de opname ({geluid['brom_db']} dB, je stem "
+                                       f"{geluid['spraak_db']} dB): dat maakt de analyse onbetrouwbaar. Houd de "
+                                       "microfoon iets opzij van je mond (niet ervoor) en zet ventilatoren uit."})
+        if geluid["zacht"]:
+            regels.insert(0, {"soort": "fout", "bron": "opname",
+                              "tekst": "De opname is erg zacht: spreek wat luider of zet de microfoon harder."})
+        try:
+            woorden = woord_oordeel(zin_id, rijen[zin_id], res)
+        except Exception as e:  # noqa: BLE001 — per woord is extra; de rest van de uitslag gaat voor
+            print("woord_oordeel mislukt:", repr(e), flush=True)
+            woorden = []
+        uit = {"id": zin_id, "oordeel": oordeel, "score": score, "woorden": woorden, "feedback": regels,
+               "geluid": geluid, "microfoon": microfoon, "resultaten": res,
                "sec": round(time.perf_counter() - t0, 1)}
         (archief / f"{zin_id}-{stempel}.json").write_text(json.dumps(uit, ensure_ascii=False, indent=1),
                                                           encoding="utf-8")

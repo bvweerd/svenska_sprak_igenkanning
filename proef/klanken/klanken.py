@@ -20,7 +20,8 @@ import soundfile as sf
 import torch
 from transformers import AutoProcessor, Wav2Vec2ForCTC
 
-from proef_common import RESULTATEN, foutpercentage, normaliseer, opnames, ops_tekst, schrijf_csv, serveer, zin_voor, zinnen, bewerkingen
+from proef_common import (KLANK_PER_WOORD, KLANK_VARIANTEN, RESULTATEN, bewerkingen, leer_varianten, foutpercentage, normaliseer, opnames, ops_tekst,
+                          schrijf_csv, serveer, zin_voor, zinnen)
 
 MODELLEN = {
     "xlsr53-espeak": "/modellen/wav2vec2-xlsr-53-espeak-cv-ft",
@@ -49,15 +50,74 @@ def lees_woordenboek():
     return wb
 
 
+def woord_klanken(tekst, wb):
+    """Per woord de verwachte (grove) klanken: [(woord, [klank, ...]), ...]; leeg als het woord onbekend is."""
+    return [(w, [g for g in (grof(k) for k in wb.get(w, [])) if g]) for w in normaliseer(tekst).split()]
+
+
 def verwacht_mfa(tekst, wb):
-    klanken = []
-    for w in normaliseer(tekst).split():
-        klanken += [grof(k) for k in wb.get(w, [])]
-    return [k for k in klanken if k]
+    return [k for _, ks in woord_klanken(tekst, wb) for k in ks]
 
 
-def verwacht_espeak(tekst):
-    uit = subprocess.run(["espeak-ng", "-v", "sv", "-q", "--ipa", "--sep=_", tekst],
+def per_woord(woorden, ops):
+    """Verdeelt de klank-uitlijning over de woorden: welke klanken van welk woord afwijken.
+    ops komt van bewerkingen(verwacht, herkend); verwacht = alle klanken van woorden achter elkaar."""
+    eigenaar = [i for i, (_, ks) in enumerate(woorden) for _ in ks]   # woordnummer per verwachte klank
+    uit = [{"woord": w, "verwacht": " ".join(ks), "herkend": [], "fouten": [], "goed": 0, "n": len(ks)}
+           for w, ks in woorden]
+
+    def grens(pos):
+        """Woorden rond de grens vóór verwachte klank pos: (vorig woord, onbekende woorden ertussen, volgend)."""
+        vorig = eigenaar[pos - 1] if pos > 0 else -1
+        volgend = eigenaar[pos] if pos < len(eigenaar) else len(woorden)
+        return vorig, [i for i in range(vorig + 1, volgend) if not woorden[i][1]], volgend
+
+    def plaats(i, b, als_fout):
+        uit[i]["herkend"].append(b)
+        if als_fout:
+            uit[i]["fouten"].append({"soort": "extra", "gehoord": b})
+            uit[i]["n"] += 1
+
+    pos, wachtend = 0, []   # wachtend: extra klanken op een woordgrens, nog niet toegewezen
+    for soort, a, b in ops:
+        if soort == "I":
+            vorig, onbekend, volgend = grens(pos)
+            if onbekend:                       # klanken van een woord dat niet in het woordenboek staat
+                plaats(onbekend[0], b, False)
+            elif 0 <= vorig == (eigenaar[pos] if pos < len(eigenaar) else None):
+                plaats(vorig, b, True)        # midden in een woord
+            else:
+                wachtend.append(b)             # op de grens: hangt af van wat er volgt
+            continue
+        i = eigenaar[pos]
+        if wachtend:
+            # Gaat het volgende woord meteen mis, dan hoort de extra klank daarbij; anders bij het vorige.
+            vorig = eigenaar[pos - 1] if pos > 0 else i
+            doel = i if soort != "=" or pos == 0 else vorig
+            for x in wachtend:
+                plaats(doel, x, True)
+            wachtend = []
+        pos += 1
+        if soort == "=":
+            uit[i]["herkend"].append(b)
+            uit[i]["goed"] += 1
+        elif soort == "S":
+            uit[i]["herkend"].append(b)
+            uit[i]["fouten"].append({"soort": "anders", "verwacht": a, "gehoord": b})
+        else:
+            uit[i]["fouten"].append({"soort": "weg", "verwacht": a})
+    for x in wachtend:                         # extra klanken aan het eind
+        if eigenaar:
+            plaats(eigenaar[-1], x, True)
+    for u in uit:
+        u["herkend"] = " ".join(u["herkend"])
+        goed, n = u.pop("goed"), u.pop("n")
+        u["score"] = round(goed / n, 2) if u["verwacht"] and n else None   # None: niet in het woordenboek
+    return uit
+
+
+def verwacht_espeak(tekst, stem="sv"):
+    uit = subprocess.run(["espeak-ng", "-v", stem, "-q", "--ipa", "--sep=_", tekst],
                          capture_output=True, text=True, check=True).stdout
     return " ".join(k for k in re.split(r"[_\s]+", uit) if k)
 
@@ -89,7 +149,8 @@ def analyseer(naam, model, processor, wb, spreker, zin_id, wav, r):
     ruw = herken(model, processor, str(wav))
     sec = time.perf_counter() - t0
     herkend = [g for g in (grof(k) for k in ruw) if g]
-    verwacht = verwacht_mfa(r["zweeds"], wb)
+    woorden = woord_klanken(r["zweeds"], wb)
+    verwacht = [k for _, ks in woorden for k in ks]
     _, ops = bewerkingen(verwacht, herkend)
     return {
         "model": naam, "spreker": spreker, "id": zin_id, "deel": r["deel"][0],
@@ -98,6 +159,7 @@ def analyseer(naam, model, processor, wb, spreker, zin_id, wav, r):
         "herkend_ruw": " ".join(ruw), "espeak": verwacht_espeak(r["zweeds"]),
         "per": round(foutpercentage(verwacht, herkend), 3),
         "verschillen": ops_tekst(ops), "sec": round(sec, 2),
+        "per_woord": per_woord(woorden, ops),
     }
 
 
@@ -111,6 +173,20 @@ def main():
             rij = analyseer(naam, model, processor, wb, spreker, zin_id, wav, zin_voor(spreker, zin_id, rijen_tsv))
             uit.append(rij)
             print(f"{naam:14} {spreker:6} {zin_id}  {rij['herkend']}   [{rij['verschillen']}]", flush=True)
+    # Per woord bewaren (voor controle achteraf) en uit de moedertaalsprekers leren welke afwijkingen van de
+    # woordenboek-uitspraak normaal zijn; de webpagina en het verslag gebruiken die bij het oordeel per woord.
+    import json
+    KLANK_PER_WOORD.write_text(json.dumps({f"{r['spreker']}|{r['id']}|{r['model']}": r["per_woord"] for r in uit},
+                                          ensure_ascii=False), encoding="utf-8")
+    varianten = leer_varianten((r["spreker"], r["model"], r["per_woord"]) for r in uit)
+    KLANK_VARIANTEN.write_text(json.dumps(varianten, ensure_ascii=False, indent=1), encoding="utf-8")
+    for m, v in varianten.items():
+        print(f"{m}: {len(v['anders'])} normale verwisselingen, {len(v['weg'])} weglatingen, "
+              f"{len(v['extra'])} extra klanken (uit {v['n_woorden']} woorden van moedertaalsprekers)")
+    # per_woord is voor de webpagina; in de CSV alleen de woorden met afwijkende klanken, leesbaar.
+    for rij in uit:
+        rij["woorden_afwijkend"] = " ".join(f"{w['woord']}:{w['score']}" for w in rij.pop("per_woord")
+                                            if w["score"] is not None and w["score"] < 1)
     schrijf_csv(RESULTATEN / "klanken.csv", uit, list(uit[0]) if uit else ["model"])
 
 

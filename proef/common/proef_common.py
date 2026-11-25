@@ -11,6 +11,7 @@ OPNAMES = DATA / "opnames"          # jouw bestanden: <id>.<ext> of <spreker>/<i
 WERK = DATA / "werk"                # tussenbestanden (niet in git)
 CORPUS = WERK / "corpus"            # 16 kHz mono wav + .lab per spreker, in MFA-vorm
 PIPER_RUW = WERK / "piper_ruw"      # Piper-uitvoer voor de omzetting
+ANKER_RUW = WERK / "anker_ruw"      # Zweedse zinnen voorgelezen met Nederlandse uitspraak (espeak-ng nl)
 MFA_UIT = WERK / "mfa"              # TextGrids van MFA
 RESULTATEN = DATA / "resultaten"    # CSV's en verslag
 
@@ -22,6 +23,7 @@ def zinnen():
 
 
 EXTERN = "extern-"   # sprekermap in het corpus voor opnames van moedertaalsprekers
+ANKER = "anker-nl"   # sprekermap voor het accent-ankerpunt (0 op de schaal)
 
 
 def zin_voor(spreker, zin_id, rijen):
@@ -48,6 +50,50 @@ def opnames():
 
 # Schrijfwijzen die hetzelfde zijn (Whisper schrijft getallen soms in cijfers).
 GELIJKE_VORMEN = {"idag": "i dag", "7": "sju", "20": "tjugo", "27": "tjugosju"}
+
+
+# ---------- audio omzetten en schoonmaken (ffmpeg; gebruikt door prep en de webpagina) ----------
+
+LAAG = "lowpass=f=80,lowpass=f=80"         # bromgeluid, plof bij het aanzetten van de microfoon
+SPRAAK = "highpass=f=80,highpass=f=80"     # alles waar spraak in zit
+PLOF_SEC = 0.6                             # zo lang duurt de plof bij het aanzetten (gemeten: ±0,6 s)
+
+
+def _rms(bron, filter_, start=None, eind=None):
+    """RMS (dB) van een stuk audio na een filter, via ffmpeg astats."""
+    import subprocess
+    trim = f"atrim={start or 0}" + (f":{eind}" if eind else "") + "," if start or eind else ""
+    uit = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(bron), "-af",
+                          f"{trim}{filter_},astats=metadata=0:measure_overall=RMS_level:measure_perchannel=none",
+                          "-f", "null", "-"], capture_output=True, text=True).stderr
+    m = re.findall(r"RMS level dB: (-?[\d.]+|-inf)", uit)
+    return float(m[-1]) if m and m[-1] != "-inf" else -120.0
+
+
+def zet_om(bron, doel):
+    """Opname → 16 kHz mono wav, schoongemaakt. Begint de opname met een plof (veel meer laag dan
+    spraak in de eerste 0,25 s, typisch voor een headset die net aangaat), dan gaat de eerste 0,6 s
+    eraf; brom onder 80 Hz gaat altijd weg. Geeft info terug (voor een waarschuwing op de pagina)."""
+    import subprocess
+    plof_laag = _rms(bron, LAAG, 0, 0.25)
+    spraak = _rms(bron, SPRAAK, 0.25)
+    # Alleen een echte plof: luid (gemeten bij een headset: −11 tot −14 dB) én veel luider dan de spraak.
+    # Zo blijft een stille aanloop (Piper: −60 dB) gewoon staan.
+    # Een plof houdt daarna op (gemeten: −11 dB, na 0,7 s −35 dB); een stem die meteen begint niet.
+    laag_daarna = _rms(bron, LAAG, 0.7)
+    # En een plof is alleen laag: in hetzelfde begin is de spraakband veel zachter (een stem niet).
+    spraak_begin = _rms(bron, SPRAAK, 0, 0.25)
+    plof = plof_laag > -30 and plof_laag > spraak_begin + 6 and plof_laag > laag_daarna + 12
+    start = PLOF_SEC if plof else 0
+    brom = _rms(bron, LAAG, max(start, 0.25))          # wat er na de plof aan laag overblijft
+    spraak = _rms(bron, SPRAAK, start)
+    af = (f"atrim=start={start},asetpts=PTS-STARTPTS," if plof else "") + SPRAAK
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(bron), "-af", af, "-ac", "1",
+                    "-ar", "16000", "-sample_fmt", "s16", str(doel)], check=True)
+    return {"plof_weggehaald": plof, "brom_db": round(brom, 1), "spraak_db": round(spraak, 1),
+            # Onder 80 Hz zit ook de grondtoon van een lage stem; pas als het laag luider is dan de spraak,
+            # is het echt brom (ventilator, luchtstroom).
+            "veel_brom": brom > spraak + 3 and brom > -40, "zacht": spraak < -45}
 
 
 def normaliseer(tekst):
@@ -152,3 +198,224 @@ def serveer(analyseer, poort):
 
     print(f"API luistert op poort {poort}", flush=True)
     HTTPServer(("0.0.0.0", poort), Handler).serve_forever()
+
+
+# ---------- score: hoe dicht zit een opname bij een moedertaalspreker? ----------
+# Eén ruwe score (0–100) uit drie onderdelen, daarna vergeleken met de scores van moedertaalsprekers
+# (FLEURS, automatisch opgehaald). De batch (verslag) en de webpagina rekenen met dezelfde code.
+
+# Juiste uitspraakvariant bij de woorden met woordaccent; overige variantwoorden: 'goed'.
+DOEL_ACCENT = {"A01": "accent1", "A02": "accent2", "A03": "accent1", "A04": "accent2", "D06": "accent2"}
+ACCENTWOORDEN = {"anden", "tanken"}
+SCORE_GEWICHT = {"klanken": 0.5, "verstaan": 0.3, "uitspraak": 0.2}
+SCORE_WHISPER = "kb-whisper-small"     # zelfde maat als de webpagina
+SCORE_KLANKEN = "xlsr300m-sv"          # voor de klankuitleg per woord
+KLANK_MODELLEN = ("xlsr300m-sv", "xlsr53-espeak")
+# Mediaan foutpercentage (PER) van moedertaalsprekers per model; wordt bij de ijking opnieuw gemeten.
+NATIVE_PER = {"xlsr300m-sv": 0.25, "xlsr53-espeak": 0.40}
+KLANK_GEWICHT = {"xlsr300m-sv": 0.75, "xlsr53-espeak": 0.25}
+IJKING = WERK / "score_ijking.json"
+ACCENT_NAAM = "Nederlands accent"   # het 0-punt van de schaal
+
+
+def doel_variant(zin_id, woord):
+    return DOEL_ACCENT.get(zin_id, "goed") if woord in ACCENTWOORDEN else "goed"
+
+
+def score_onderdelen(whisper=None, klanken=None, keuze=None, zin_id="", extern=False, native_per=None):
+    """Onderdelen (0–1) uit de ruwe uitkomsten; ontbrekende onderdelen blijven weg.
+    whisper: dict met wer_verwacht en woorden ('w:0.93 ...'); klanken: {model: dict met per};
+    keuze: lijst dicts met woord en gekozen (MFA keuze-uitspraak)."""
+    uit = {}
+    # klanken: {model: rij met 'per'}. Per model 1 − PER, gedeeld door wat een moedertaalspreker bij dat
+    # model haalt (afgetopt op 1). Het Zweedse model weegt 75%: alleen dat model hoort accent echt
+    # (gemeten: AUC 0,96 tegen 0,64 voor espeak); het andere (25%) dempt een model dat de weg kwijtraakt.
+    native = native_per or NATIVE_PER
+    rel = {m: min(1.0, max(0.0, 1 - float(r["per"])) / (1 - native.get(m, 0.3)))
+           for m, r in (klanken or {}).items() if r and r.get("per") not in (None, "")}
+    if rel:
+        gewicht = {m: KLANK_GEWICHT.get(m, 0.5) for m in rel}
+        uit["klanken"] = sum(gewicht[m] * v for m, v in rel.items()) / sum(gewicht.values())
+    if whisper and whisper.get("wer_verwacht") not in (None, ""):
+        zeker = [float(w.rsplit(":", 1)[1]) for w in str(whisper.get("woorden", "")).split() if ":" in w]
+        goed = max(0.0, 1 - float(whisper["wer_verwacht"]))
+        uit["verstaan"] = 0.75 * goed + 0.25 * (sum(zeker) / len(zeker) if zeker else goed)
+    # Bij moedertaalsprekers weet je niet welk woordaccent bedoeld is: accentwoorden tellen niet mee.
+    k = [r for r in (keuze or []) if not (extern and r["woord"] in ACCENTWOORDEN)]
+    if k:
+        uit["uitspraak"] = sum(r["gekozen"] == doel_variant(zin_id, r["woord"]) for r in k) / len(k)
+    return uit
+
+
+def ruwe_score(onderdelen):
+    som = sum(SCORE_GEWICHT[n] for n in onderdelen)
+    return round(100 * sum(SCORE_GEWICHT[n] * v for n, v in onderdelen.items()) / som, 1) if som else None
+
+
+def maak_ijking(scores, bron, native_per=None, anker=None):
+    """Verdeling van ruwe scores van de referentiesprekers (100) en van het accent-anker (0)
+    → werk/score_ijking.json."""
+    import json
+    s = sorted(scores)
+    if not s:
+        return None
+    a = sorted(anker or [])
+    ijking = {"bron": bron, "n": len(s), "mediaan": s[len(s) // 2], "p10": s[len(s) // 10],
+              "p25": s[len(s) // 4], "native_per": native_per or NATIVE_PER, "scores": s,
+              "anker": {"bron": "Zweedse zinnen met Nederlandse uitspraak (espeak-ng nl)", "n": len(a),
+                        "accent": ACCENT_NAAM, "mediaan": a[len(a) // 2]} if a else None}
+    IJKING.parent.mkdir(parents=True, exist_ok=True)
+    IJKING.write_text(json.dumps(ijking, ensure_ascii=False, indent=1), encoding="utf-8")
+    return ijking
+
+
+def lees_ijking():
+    import json
+    try:
+        return json.loads(IJKING.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def vergelijk(ruw, ijking):
+    """Ruwe score op een schaal met twee ijkpunten: 0 = mediaan van het Nederlandse accent-anker,
+    100 = mediaan van de moedertaalsprekers. Plus percentiel t.o.v. de moedertaalsprekers en een niveau.
+    'Als een moedertaalspreker' pas vanaf het 25e percentiel van de moedertaalsprekers: streng genoeg dat
+    het accent-anker het (bijna) nooit haalt."""
+    if ruw is None or not ijking:
+        return {"ruw": ruw}
+    s = ijking["scores"]
+    percentiel = round(100 * sum(x <= ruw for x in s) / len(s))
+    nul = (ijking.get("anker") or {}).get("mediaan")
+    accent = (ijking.get("anker") or {}).get("accent", "Nederlands accent")
+    if nul is not None and ijking["mediaan"] > nul:
+        schaal = round(100 * (ruw - nul) / (ijking["mediaan"] - nul))
+    else:                                   # geen anker: oude verhouding t.o.v. de mediaan
+        schaal = round(100 * ruw / ijking["mediaan"]) if ijking["mediaan"] else None
+    gelijkenis = None if schaal is None else max(0, min(100, schaal))
+    if ruw >= ijking.get("p25", ijking["p10"]):
+        niveau = "als een moedertaalspreker"
+    elif gelijkenis is not None and gelijkenis >= 50:
+        niveau = "met een licht accent"
+    elif gelijkenis is not None and gelijkenis > 0:
+        niveau = "met een duidelijk accent"
+    else:
+        niveau = f"met een sterk {accent}"
+    return {"ruw": ruw, "percentiel": percentiel, "gelijkenis": gelijkenis, "niveau": niveau, "nul": accent,
+            "referentie": f"{ijking['bron']} (n={ijking['n']})"
+                          + (f"; 0 = {accent} (n={ijking['anker']['n']})" if ijking.get("anker") else "")}
+
+
+# ---------- oordeel per woord (klanken): alleen afwijkingen die moedertaalsprekers NIET maken ----------
+# De verwachte klanken komen uit één 'woordenboek-uitspraak' (MFA-woordenboek of espeak-ng). Echte sprekers
+# wijken daar voortdurend van af (zo bleek ook in een Nederlandse controle: g als [x], r als [ɾ], v als [f]). Daarom leert de
+# batch uit de moedertaalsprekers (FLEURS) welke afwijkingen normaal zijn; die tellen per woord niet als fout.
+
+KLANK_VARIANTEN = WERK / "klank_varianten.json"
+KLANK_PER_WOORD = WERK / "klanken_per_woord.json"
+VARIANT_MIN_N = 3          # minstens zo vaak bij moedertaalsprekers gezien …
+VARIANT_MIN_AANDEEL = 0.10  # … en bij minstens dit aandeel van die verwachte klank (of van de woorden, bij 'extra')
+
+KLANK_NAAM = {
+    "ɧ": "sj-klank (sj, sk, stj)", "ɕ": "tj-klank (tj, k vóór e/i/y/ä/ö)", "ʉ": "Zweedse u (hus)",
+    "ɵ": "korte Zweedse u (buss)", "u": "o-klank (sol, als oe)", "ʊ": "korte o (ost)", "o": "å (lang)",
+    "ɔ": "korte å/o", "y": "y (ny)", "ʏ": "korte y", "ø": "ö (lang)", "œ": "korte ö", "ɛ": "ä/e (kort)",
+    "e": "e (lang)", "ɪ": "korte i", "i": "i", "ɑ": "lange a", "a": "korte a", "ŋ": "ng-klank",
+    "ʂ": "rs-klank", "r": "r", "j": "j (ook g/gj/hj)", "v": "v (ook w)",
+}
+
+# Klinkerparen die alleen in lengte/openheid verschillen (de klankherkenner hoort geen lengte):
+# een verwisseling is hooguit 'let op'. Lengte zelf beoordeelt MFA bij de doelwoorden.
+NABIJ = {frozenset(p) for p in [("e", "ɛ"), ("i", "ɪ"), ("u", "ʊ"), ("o", "ɔ"), ("a", "ɑ"), ("y", "ʏ"),
+                                 ("ø", "œ"), ("ʉ", "ɵ")]}
+
+
+def klank(k):
+    return f"{KLANK_NAAM[k]} [{k}]" if k in KLANK_NAAM else f"[{k}]"
+
+
+def leer_varianten(rijen):
+    """rijen: (spreker, model, per_woord). Uit de moedertaalsprekers (spreker extern-…) per model tellen
+    welke afwijkingen van de woordenboek-uitspraak normaal zijn. → {model: {"anders": [[v, g]], "weg": [v],
+    "extra": [g], "n_woorden": …}}"""
+    from collections import Counter
+    per_model = {}
+    for spreker, model, pw in rijen:
+        if not spreker.startswith(EXTERN):
+            continue
+        t = per_model.setdefault(model, {"klank": Counter(), "anders": Counter(), "weg": Counter(),
+                                         "extra": Counter(), "woorden": 0})
+        for w in pw:
+            if w.get("score") is None:
+                continue
+            t["woorden"] += 1
+            t["klank"].update(w["verwacht"].split())
+            for f in w["fouten"]:
+                if f["soort"] == "anders":
+                    t["anders"][(f["verwacht"], f["gehoord"])] += 1
+                elif f["soort"] == "weg":
+                    t["weg"][f["verwacht"]] += 1
+                else:
+                    t["extra"][f["gehoord"]] += 1
+    uit = {}
+    for model, t in per_model.items():
+        ok = lambda n, totaal: n >= VARIANT_MIN_N and n / max(totaal, 1) >= VARIANT_MIN_AANDEEL
+        uit[model] = {
+            "anders": sorted([v, g] for (v, g), n in t["anders"].items() if ok(n, t["klank"][v])),
+            "weg": sorted(v for v, n in t["weg"].items() if ok(n, t["klank"][v])),
+            "extra": sorted(g for g, n in t["extra"].items() if ok(n, t["woorden"])),
+            "n_woorden": t["woorden"],
+        }
+    return uit
+
+
+def lees_klank_varianten():
+    import json
+    try:
+        return json.loads(KLANK_VARIANTEN.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def klank_oordeel(w, var=None):
+    """Oordeel over één woord uit de klankherkenner (per_woord-item): ('goed'|'let_op'|'fout', uitleg|None).
+    var: de geleerde moedertaalvarianten van dit model (leer_varianten)."""
+    if w.get("score") is None or not w.get("fouten"):
+        return "goed", None
+    var = var or {}
+    anders_ok = {tuple(x) for x in var.get("anders", [])}
+    weg_ok, extra_ok = set(var.get("weg", [])), set(var.get("extra", []))
+    n_verwacht = len(w["verwacht"].split())
+    goed = round(w["score"] * (n_verwacht + sum(f["soort"] == "extra" for f in w["fouten"])))
+    normaal, klein, echt = 0, [], []
+    for f in w["fouten"]:
+        if ((f["soort"] == "anders" and (f["verwacht"], f["gehoord"]) in anders_ok)
+                or (f["soort"] == "weg" and f["verwacht"] in weg_ok)
+                or (f["soort"] == "extra" and f["gehoord"] in extra_ok)):
+            normaal += f["soort"] != "extra"      # normale variant: telt als goed (extra: telt niet mee)
+        elif f["soort"] == "anders" and frozenset((f["verwacht"], f["gehoord"])) in NABIJ:
+            klein.append(f)
+        else:
+            echt.append(f)
+    n = n_verwacht + sum(f["soort"] == "extra" for f in echt + klein)
+    score = (goed + normaal + 0.5 * len(klein)) / max(n, 1)
+    # Eén afwijkende klank zegt weinig: de klankherkenner zit ook bij moedertaalsprekers vaak naast (±1 op 4
+    # klanken). Gemeten op FLEURS + accent-anker: met 'score < 0,6' krijgt 18% van de woorden van Zweden een
+    # melding (eerst 55%) en 35% van de woorden met Nederlands accent. Strenger dan dit maakt de tips onbetrouwbaar.
+    if not echt or score >= 0.6:
+        return "goed", None
+    delen = []
+    for f in echt + klein:
+        if f["soort"] == "anders":
+            delen.append(f"{klank(f['verwacht'])} klonk als {klank(f['gehoord'])}"
+                         + (" (bijna goed: lengte/openheid)" if f in klein else ""))
+        elif f["soort"] == "weg":
+            delen.append(f"{klank(f['verwacht'])} niet gehoord")
+        else:
+            delen.append(f"extra {klank(f['gehoord'])}")
+    gehoord = f"verwacht [{w['verwacht']}], gehoord [{w['herkend'] or '–'}]"
+    tekst = (f"klanken: de meeste klanken wijken af ({gehoord})" if len(delen) > 3
+             else "klanken: " + "; ".join(delen) + f" ({gehoord})")
+    # 'fout' pas als het woord grotendeels anders klinkt én er minstens twee echte afwijkingen zijn.
+    status = "fout" if score < 0.34 and len(echt) >= 2 else "let_op"
+    return status, tekst

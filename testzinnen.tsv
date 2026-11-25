@@ -28,6 +28,38 @@ C09	C zin	Barnen leker i parken.			De kinderen spelen in het park.	accent 2 (bar
 C10	C zin	Sjuksköterskan tjänar ganska bra.			De verpleegkundige verdient vrij goed.	sj, tj, zachte sk	goed uitspreken
 C11	C zin	Det finns tjugosju stjärnor på himlen.			Er staan zevenentwintig sterren aan de hemel.	tj, sj, stj	goed uitspreken
 C12	C zin	Huset är gult och fönstren är stora.			Het huis is geel en de ramen zijn groot.	u, ö	goed uitspreken
+F01	F A1	Hej! Hur mår du?			Hoi! Hoe gaat het met je?	groet, vraag, å	goed uitspreken
+F02	F A1	Jag mår bra, tack.			Het gaat goed, dank je.	korte zin, å	goed uitspreken
+F03	F A1	Vad heter du?			Hoe heet je?	vraagwoord, lange e	goed uitspreken
+F04	F A1	Jag kommer från Holland.			Ik kom uit Nederland.	å, korte o	goed uitspreken
+F05	F A1	Jag talar lite svenska.			Ik spreek een beetje Zweeds.	lange a, sv	goed uitspreken
+F06	F A1	Hur mycket kostar det?			Hoeveel kost het?	y, korte klinkers	goed uitspreken
+F07	F A1	Var är toaletten?			Waar is het toilet?	ä, lange t	goed uitspreken
+F08	F A1	Jag har två barn.			Ik heb twee kinderen.	två (å), rn	goed uitspreken
+F09	F A1	Vi ses i morgon.			Tot morgen.	morgon (o als å)	goed uitspreken
+F10	F A1	Jag dricker kaffe på morgonen.			Ik drink 's ochtends koffie.	korte i, ck	goed uitspreken
+F11	F A1	Det är fint väder i dag.			Het is mooi weer vandaag.	ä, lange e	goed uitspreken
+F12	F A1	Ursäkta, talar du engelska?			Pardon, spreek je Engels?	rs-klank, ng	goed uitspreken
+G01	G A2	I helgen ska vi hälsa på min mormor.			Dit weekend gaan we oma bezoeken.	V2 (inversie), lg	goed uitspreken
+G02	G A2	Jag brukar cykla till jobbet.			Ik fiets meestal naar mijn werk.	y, j	goed uitspreken
+G03	G A2	Kan jag få notan, tack?			Mag ik de rekening, alsjeblieft?	få, lange o	goed uitspreken
+G04	G A2	Tåget till Stockholm är försenat.			De trein naar Stockholm is vertraagd.	å, rs-klank	goed uitspreken
+G05	G A2	Förra sommaren var vi i Norrland.			Vorige zomer waren we in Norrland.	V2, rr	goed uitspreken
+G06	G A2	Jag har bott i Sverige i två år.			Ik woon al twee jaar in Zweden.	Sverige (g als j), år	goed uitspreken
+G07	G A2	Hon tycker om att laga mat.			Ze kookt graag.	y, lange a	goed uitspreken
+G08	G A2	Vi måste handla mjölk och bröd.			We moeten melk en brood kopen.	mj, ö	goed uitspreken
+G09	G A2	Om det regnar stannar vi hemma.			Als het regent, blijven we thuis.	bijzin + inversie, gn	goed uitspreken
+G10	G A2	Jag skulle vilja boka ett bord för två.			Ik wil graag een tafel voor twee reserveren.	harde sk (skulle), rd	goed uitspreken
+G11	G A2	Ring mig när du är framme.			Bel me als je er bent.	ng, mig (mej)	goed uitspreken
+G12	G A2	Det tar ungefär tjugo minuter med buss.			Het duurt ongeveer twintig minuten met de bus.	tj, ungefär (g als j)	goed uitspreken
+T01	T tekst	Ingrid simmar tre gånger i veckan.			Ingrid zwemt drie keer per week.	simmar, gånger, veckan	goed uitspreken
+T02	T tekst	Hon simmar alltid på morgonen, innan hon går till jobbet.			Ze zwemt altijd 's ochtends, voordat ze naar haar werk gaat.	morgonen (o als å), lange zin	goed uitspreken
+T03	T tekst	Ibland simmar Fleur med henne.			Soms zwemt Fleur met haar mee.	V2 (inversie), henne	goed uitspreken
+T04	T tekst	Fleur simmar inte så ofta, men hon tycker om det.			Fleur zwemt niet zo vaak, maar ze vindt het leuk.	ofta, tycker om (y)	goed uitspreken
+T05	T tekst	Sedan dricker de kaffe.			Daarna drinken ze koffie.	de (als dom), V2	goed uitspreken
+T06	T tekst	Olle simmar aldrig.			Olle zwemt nooit.	Olle (accent 2), aldrig	goed uitspreken
+T07	T tekst	Han tycker inte om att simma.			Hij houdt niet van zwemmen.	ontkenning, att	goed uitspreken
+T08	T tekst	Ingrid simmar tre gånger i veckan. Hon simmar alltid på morgonen, innan hon går till jobbet. Ibland simmar Fleur med henne. Fleur simmar inte så ofta, men hon tycker om det. Sedan dricker de kaffe. Olle simmar aldrig. Han tycker inte om att simma.			De hele tekst: Ingrid zwemt drie keer per week …	hele tekst voorlezen (vloeiendheid)	goed uitspreken
 D01	D fout	sju		B07	zeven	sj als Nederlandse sj, u als oe	FOUT: zeg ‘sjoe’ zoals in het Nederlands
 D02	D fout	tack		B04	bedankt	lange a	FOUT: zeg ‘taak’ (lange a)
 D03	D fout	glas		B01	glas	korte a	FOUT: zeg het kort, zoals Nederlands ‘glas’

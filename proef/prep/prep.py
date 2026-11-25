@@ -8,10 +8,11 @@ Bronnen:
   werk/piper_ruw/<id>.wav        → spreker 'piper'
 """
 import re
+import shutil
 import subprocess
 import sys
 
-from proef_common import CORPUS, EXTERN, OPNAMES, PIPER_RUW, zinnen
+from proef_common import ANKER, ANKER_RUW, CORPUS, EXTERN, OPNAMES, PIPER_RUW, zet_om, zinnen
 
 AUDIO = {".wav", ".m4a", ".mp4", ".mp3", ".ogg", ".opus", ".flac", ".aac", ".webm", ".3gp", ".amr"}
 
@@ -33,11 +34,16 @@ def bronnen():
     if PIPER_RUW.exists():
         for p in sorted(PIPER_RUW.glob("*.wav")):
             yield "piper", p
+    if ANKER_RUW.exists():
+        for p in sorted(ANKER_RUW.glob("*.wav")):
+            yield ANKER, p
 
 
 def main():
     rijen = zinnen()
-    gedaan, onbekend = 0, []
+    # Elke keer opnieuw opbouwen: weggehaalde of vervangen opnames mogen niet blijven meetellen.
+    shutil.rmtree(CORPUS, ignore_errors=True)
+    gedaan, onbekend, plofjes = 0, [], []
     extern = 0
     for spreker, bron in bronnen():
         if spreker.startswith(EXTERN):
@@ -48,8 +54,7 @@ def main():
             naam = re.sub(r"[^A-Za-z0-9_-]", "_", bron.stem)
             doel = CORPUS / spreker / f"{naam}.wav"
             doel.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(bron),
-                            "-ac", "1", "-ar", "16000", "-sample_fmt", "s16", str(doel)], check=True)
+            zet_om(bron, doel)   # zelfde schoonmaak als eigen opnames (brom eruit), voor een eerlijke ijking
             doel.with_suffix(".lab").write_text(txt.read_text(encoding="utf-8").strip() + "\n",
                                                 encoding="utf-8")
             extern += 1
@@ -60,18 +65,21 @@ def main():
             continue
         doel = CORPUS / spreker / f"{zin_id}.wav"
         doel.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
-            ["ffmpeg", "-loglevel", "error", "-y", "-i", str(bron),
-             "-ac", "1", "-ar", "16000", "-sample_fmt", "s16", str(doel)],
-            check=True)
+        info = zet_om(bron, doel)   # 16 kHz mono; plof bij het aanzetten en brom onder 80 Hz eruit
+        if info["plof_weggehaald"] or info["veel_brom"]:
+            plofjes.append(f"{spreker}/{zin_id}" + (" (plof weg)" if info["plof_weggehaald"] else "")
+                           + (f" (veel brom: {info['brom_db']} dB tegen spraak {info['spraak_db']} dB)"
+                              if info["veel_brom"] else ""))
         # MFA krijgt de verwachte (goede) zin: bij een D-opname is dat juist de test.
         doel.with_suffix(".lab").write_text(rijen[zin_id]["zweeds"] + "\n", encoding="utf-8")
         gedaan += 1
     print(f"{gedaan} eigen/Piper-opnames en {extern} externe fragmenten voorbereid in {CORPUS}")
+    if plofjes:
+        print("Schoongemaakt:", *plofjes, sep="\n  ")
     if onbekend:
         print("Overgeslagen (naam is geen id uit testzinnen.tsv):", *onbekend, sep="\n  ")
-    ontbrekend = sorted(set(rijen) - {p.stem for p in (CORPUS / "ik").glob("*.wav")}) \
-        if (CORPUS / "ik").exists() else sorted(rijen)
+    gedaan_ik = {p.stem for p in (CORPUS / "ik").glob("*.wav")}
+    ontbrekend = sorted(set(rijen) - gedaan_ik)
     if ontbrekend:
         print(f"Nog niet opgenomen ({len(ontbrekend)}):", " ".join(ontbrekend))
     if gedaan + extern == 0:

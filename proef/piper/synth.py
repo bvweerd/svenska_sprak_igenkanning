@@ -8,22 +8,48 @@ import wave
 
 from piper import PiperVoice
 
-from proef_common import PIPER_RUW, zinnen
+from proef_common import ANKER_RUW, PIPER_RUW, zinnen
 
 STEM = os.environ.get("PIPER_STEM", "/stemmen/sv_SE-nst-medium.onnx")
 
 
+def te_doen(map_, rijen):
+    """Alleen zinnen die nieuw zijn of waarvan de tekst veranderde (bijgehouden in _teksten.json)."""
+    import json
+    lijst = map_ / "_teksten.json"
+    try:
+        oud = json.loads(lijst.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        oud = {}
+    nieuw = {i: r["zweeds"] for i, r in rijen.items() if not r["deel"].startswith("D")}
+    for weg in set(oud) - set(nieuw):                       # zin verwijderd: opname ook weg
+        (map_ / f"{weg}.wav").unlink(missing_ok=True)
+    doen = [i for i, t in nieuw.items() if oud.get(i) != t or not (map_ / f"{i}.wav").exists()]
+    return doen, lambda: lijst.write_text(json.dumps(nieuw, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 def main():
-    stem = PiperVoice.load(STEM)
+    rijen = zinnen()
     PIPER_RUW.mkdir(parents=True, exist_ok=True)
-    n = 0
-    for zin_id, r in zinnen().items():
-        if r["deel"].startswith("D"):
-            continue
-        with wave.open(str(PIPER_RUW / f"{zin_id}.wav"), "wb") as wf:
-            stem.synthesize_wav(r["zweeds"], wf)
-        n += 1
-    print(f"{n} zinnen ingesproken in {PIPER_RUW}")
+    doen, klaar = te_doen(PIPER_RUW, rijen)
+    if doen:
+        stem = PiperVoice.load(STEM)
+        for zin_id in doen:
+            with wave.open(str(PIPER_RUW / f"{zin_id}.wav"), "wb") as wf:
+                stem.synthesize_wav(rijen[zin_id]["zweeds"], wf)
+    klaar()
+    print(f"{len(doen)} zinnen (nieuw of gewijzigd) ingesproken in {PIPER_RUW}")
+
+    # Accent-ankerpunt: dezelfde zinnen met Nederlandse uitspraakregels (espeak-ng, stem 'nl').
+    # Zo heeft de score een vast 0-punt ("duidelijk Nederlands accent") naast de moedertaalsprekers (100).
+    import subprocess
+    ANKER_RUW.mkdir(parents=True, exist_ok=True)
+    doen, klaar = te_doen(ANKER_RUW, rijen)
+    for zin_id in doen:
+        subprocess.run(["espeak-ng", "-v", "nl", "-s", "150", "-w", str(ANKER_RUW / f"{zin_id}.wav"),
+                        rijen[zin_id]["zweeds"]], check=True)
+    klaar()
+    print(f"Accent-anker (Nederlandse uitspraak): {len(doen)} zinnen (nieuw of gewijzigd) in {ANKER_RUW}")
 
 
 if __name__ == "__main__":

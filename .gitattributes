@@ -1,0 +1,2 @@
+# Alles draait in Linux-containers: altijd LF, ook bij een checkout op Windows.
+* text=auto eol=lf

@@ -2,3 +2,8 @@ werk/
 bronnen/
 __pycache__/
 *.pyc
+opnames/extern/
+# Eigen opnames en uitkomsten (persoonlijk, en elke run opnieuw gemaakt) niet in git.
+opnames/*
+!opnames/.gitkeep
+resultaten/

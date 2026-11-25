@@ -2,7 +2,9 @@
 
 Proef met lokale modellen (Docker) voor Zweedse spraakherkenning en uitspraakcontrole, met als doel op termijn
 spreekopdrachten in de oefensite. `PLAN.md` beschrijft kandidaten, opzet en criteria; `testzinnen.tsv` wat er
-ingesproken wordt.
+ingesproken wordt: losse woorden en proefzinnen (A–C), zinnen op niveau A1 (F) en A2 (G), een korte
+leestekst (T: per zin en in zijn geheel), en bewuste fouten (D). Namen die niet in het uitspraakwoordenboek
+staan (zoals Fleur) gaan in `proef/common/extra_uitspraak.dict`.
 
 ## Op de pc
 
@@ -24,8 +26,21 @@ docker compose up --build
 ```
 
 Open http://localhost:8080 (de microfoon werkt alleen via `localhost` of https, dus niet vanaf een telefoon
-via het IP-adres). Kies een zin, druk op Opnemen, spreek, druk op Stop. Je krijgt:
+via het IP-adres). **Kies eerst bovenaan je microfoon** (druk op Test voor toestemming en een niveaumeter):
+zonder keuze pakt de browser de standaard van Windows, vaak de laptopmicrofoon, en dan zijn de scores
+onbruikbaar (zie „Opnamekwaliteit”). Kies een zin, druk op Opnemen, spreek, druk op Stop; daarna **Volgende zin ›**. Met het
+toetsenbord: spatie = opnemen/stoppen, → en ← = volgende/vorige zin. Vink „sla opgenomen zinnen over” aan om
+alleen langs de zinnen te gaan die je nog niet hebt ingesproken. Je krijgt:
 
+- **Score**: waar je zit op de schaal Nederlands accent (0) → moedertaalspreker (100), met een niveau (zie hieronder).
+- **Per woord**: de zin met elk woord groen (goed), oranje (let op) of rood (fout), en daaronder wat er
+  mis was: welke klank anders klonk (bv. „sj-klank [ɧ] klonk als k”), welk woord Whisper anders verstond of
+  waar het twijfelde, en of de uitspraakvariant van een doelwoord klopte. Afwijkingen van de woordenboek-
+  uitspraak die moedertaalsprekers óók maken, tellen niet: de stap `klanken` leert die uit de FLEURS-
+  fragmenten (`werk/klank_varianten.json`). Klinkers die alleen in lengte of openheid verschillen (e/ä, i/ɪ,
+  o/å …) zijn hooguit oranje. Rood pas als het woord grotendeels anders klinkt (minstens twee echte
+  afwijkingen), of als Whisper of MFA het afkeurt. Het verslag (deel 6) meet hoe vaak moedertaalsprekers
+  onterecht oranje/rood krijgen.
 - **Verstaan** (KB-Whisper small): wat het model hoorde, en welke woorden afweken.
 - **Uitspraak** (MFA keuze-uitspraak): per doelwoord of de goede of een foute uitspraak het best past.
 - **Info**: wat de klankherkenner hoorde, aantal toppen in de toonhoogte, klinkerduur.
@@ -42,6 +57,67 @@ analyse in `werk/web/archief/`. De eerste analyse na het starten duurt langer (m
 Of stap voor stap (zie de kop van `docker-compose.yml`), bv. `docker compose run --rm whisper`. Uitkomst:
 CSV's en `resultaten/verslag.md`. Opnames kunnen ook als losse bestanden in `opnames/` (WAV, m4a, mp3, webm…,
 naam = id, bv. `A01.m4a`); een tweede spreker in `opnames/<naam>/`.
+
+### Score: hoe dicht zit je bij een moedertaalspreker?
+
+Per opname een ruwe score van 0 tot 100: 50% klanken, 30% verstaan (Whisper: 1 − WER, met woordzekerheid)
+en 20% juiste uitspraakvariant (MFA, alleen bij de doelwoorden). Klanken = per klankherkenner 1 − PER, gedeeld
+door wat een moedertaalspreker bij dat model haalt; het Zweedse model weegt 75%, het espeak-model 25%.
+
+Die ruwe score komt op een **schaal met twee ijkpunten**:
+
+- **0** = dezelfde zinnen voorgelezen met Nederlandse uitspraakregels (espeak-ng `nl`, gemaakt in de stap
+  `piper`): een duidelijk Nederlands accent;
+- **100** = de mediaan van de **moedertaalsprekers** (FLEURS, zie hieronder).
+
+Het **niveau**: „als een moedertaalspreker” vanaf het 25e percentiel van de moedertaalsprekers; daaronder
+„licht accent” (schaal ≥ 50), „duidelijk accent” (> 0) of „sterk Nederlands accent”. Het verslag heeft een
+vaste **accenttest**: het Nederlandse accent moet duidelijk lager scoren dan moedertaalsprekers (AUC ≥ 0,9) en
+vrijwel nooit „als een moedertaalspreker” krijgen.
+
+Waarom zo streng: een eerdere, mildere versie (beste van de twee klankherkenners) gaf een stem met duidelijk
+Nederlands accent bij 1 op de 5 zinnen „binnen het bereik van moedertaalsprekers”. Het espeak-model hoort
+nauwelijks accent (AUC 0,64), het Zweedse wel (0,96); en Whisper verstaat geaccentueerde spraak goed, dus
+verstaanbaar ≠ Zweeds klinkend.
+
+De moedertaalsprekers komen uit **FLEURS** (Google, CC BY 4.0): `alles.sh` haalt eenmalig 40 korte zinnen van
+Hugging Face op (geen account nodig, ±190 MB downloaden, alleen de fragmenten blijven bewaard in
+`opnames/extern/fleurs/`). De ijking staat daarna in `werk/score_ijking.json`; de testpagina gebruikt die
+vanzelf. Zonder internet valt het terug op een voorlopige ijking met de computerstem. Let op: losse woorden
+geven een grovere score dan zinnen, en de Zweden lezen andere zinnen dan jij; het is een indicatie.
+
+**Opnamekwaliteit.** De klankherkenners zijn erg gevoelig voor de verhouding stem/ruis. De eerste opnames in
+deze proef waren (onbedoeld) met de laptopmicrofoon gemaakt: ruis even luid als de stem, en dan scoort ook een
+moedertaalspreker „sterk Nederlands accent” (getest: Zweedse fragmenten met die ruis erbij gaan van 27% naar
+71% klankfouten; ruisfilters achteraf helpen niet). Dezelfde zin met de headset: score 0 → 100. Daarom:
+
+- de testpagina laat je de microfoon kiezen, toont het niveau en bewaart per opname welke microfoon het was
+  (`microfoon` in `werk/web/archief/*.json`);
+- de pagina wacht 0,7 s voordat hij opneemt (een microfoon kan bij het aanzetten ploffen), en bij het omzetten
+  (`zet_om` in `proef_common`) gaat een plof aan het begin eraf en brom onder 80 Hz altijd;
+- blijft er veel brom over of is de opname erg zacht, dan meldt de pagina dat.
+
+### Geleerd van een controle in het Nederlands (niet meer in de code)
+
+Om te zien of microfoon en methode deugen, is dezelfde score tijdelijk ook in het Nederlands gebouwd (meertalig
+Whisper small, het espeak-model met Nederlandse verwachte klanken, FLEURS `nl_nl` als moedertaalsprekers) en
+door een Nederlandse moedertaalspreker ingesproken. Uitkomst en lessen:
+
+- **Met de juiste microfoon klopt de score**: 10 van de 10 zinnen „als een moedertaalspreker” (gemiddeld 99 op
+  de schaal; Nederlandse moedertaalsprekers uit FLEURS gemiddeld 87).
+- **Het oordeel per woord was te streng**: 55% van de woorden kreeg oranje/rood, bij een moedertaalspreker.
+  Bijna allemaal normale variatie t.o.v. de woordenboek-uitspraak (g als [x], r als [ɾ], v als [f], ij als
+  [aɪ]). Daarom leert de stap `klanken` nu uit moedertaalsprekers welke afwijkingen normaal zijn.
+
+Omdat Zweeds het doel is, is de Nederlandse tak er daarna weer uitgehaald (scheelde een tweede Whisper-model,
+een extra download en veel taalafhankelijke code). De opnames staan nog in `werk/nl_controle/`.
+
+### Snelheid
+
+Alles draait op de CPU. Wat de batch sneller maakt: Whisper alleen in maat `small` (die gebruikt de score; zet
+`WHISPER_MODELLEN` in `docker-compose.yml` op `"tiny base small"` om maten te vergelijken), Piper en het
+accent-anker alleen voor nieuwe of gewijzigde zinnen (`_teksten.json` in `werk/piper_ruw` en `werk/anker_ruw`),
+en FLEURS maar één keer ophalen.
 
 ### Moedertaalsprekers: wordt een Zweed onterecht afgekeurd?
 
@@ -90,10 +166,9 @@ Daarna `./proef/alles.sh --zonder-piper` (of de stappen vanaf `prep`).
 
 ## Wat al getest is en wat niet
 
-Zonder Docker getest in een Python-omgeving: `prep`, `piper`, `whisper` (met `kb-whisper-tiny`), de
-webpagina met de Whisper-API (opnemen met een nagebootste microfoon, telefoonformaat, licht en donker), en
-`prosodie` en `verslag` op nagemaakte TextGrids, en `extern commonvoice` met een nagemaakte
-Common Voice-map. `extern lingualibre` vond de bestanden, maar Wikimedia weigerde het downloaden vanuit de
-cloudomgeving (te veel verzoeken); op een gewone pc hoort dat te werken. **Niet getest**: de Docker-builds, MFA (`mfa/align.sh`,
-`mfa/api.py`, G2P) en de klankherkenners (`klanken/`). Loopt daar iets mis bij het bouwen of draaien, stuur de
-foutmelding.
+Getest met Docker Desktop op Windows (november 2026): alle images bouwen; de testpagina met alle drie de
+analyses (Whisper, klankherkenner, MFA) en de score; de hele batch (`alles.sh`) inclusief het automatisch
+ophalen van FLEURS, met Piper-opnames en echte opnames via de pagina (headset), plus de Nederlandse controle
+hierboven. **Nog niet gedaan**: een volledige set eigen Zweedse opnames met de headset (alle zinnen, ook de
+foutvarianten D); de opnames van vóór de microfoonkeuze zijn met de laptopmicrofoon gemaakt en tellen niet.
+`extern commonvoice` en `extern lingualibre` zijn niet opnieuw getest (de score heeft ze niet nodig).

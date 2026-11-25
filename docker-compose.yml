@@ -25,7 +25,8 @@ x-whisper-build: &whisper-build
   context: ./proef
   dockerfile: whisper/Dockerfile
   args:
-    WHISPER_MODELLEN: "tiny base small"
+    # Alleen small: die gebruikt de score en de testpagina. Voor een vergelijking van maten: "tiny base small".
+    WHISPER_MODELLEN: "small"
 
 services:
   # ---------- testpagina ----------

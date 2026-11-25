@@ -9,6 +9,9 @@ betekenis weet je niet welk accent goed is.
       Uitgepakte Common Voice-download (Mozilla Data Collective, CC0). Zoekt validated.tsv.
   python extern.py lingualibre [--per-woord 5]
       Losse woorden van Wikimedia Commons (Lingua Libre en Sv-<woord>.ogg); licentie per bestand.
+  python extern.py fleurs [--aantal 40] [--opnieuw]
+      Haalt zelf FLEURS sv_se (Google, CC BY 4.0) van Hugging Face: korte zinnen van moedertaalsprekers
+      als ijkpunt voor de score. Geen account nodig; alleen de gekozen fragmenten worden bewaard.
   python extern.py tsv <bestand.tsv> <bron> --pad-kolom X --tekst-kolom Y [--geen-kop] [--audiomap M]
       Elke andere set met een tabel pad/tekst (FLEURS, NST, eigen materiaal). Kolom = naam of nummer.
 
@@ -178,6 +181,66 @@ def lingualibre(args):
     schrijf_meta("lingualibre", rijen)
 
 
+# ---------- FLEURS (automatisch, voor de score-ijking) ----------
+
+WOORDENBOEK = Path("/modellen/swedish_mfa.dict")
+FLEURS = "https://huggingface.co/datasets/google/fleurs/resolve/main/data/sv_se"
+
+
+def fleurs(args):
+    import io
+    import tarfile
+    bron_map = "fleurs"
+    doelmap = UIT / bron_map
+    if (doelmap / "_bronnen.tsv").exists() and not args.opnieuw:
+        print(f"FLEURS staat al in {doelmap} (--opnieuw om opnieuw op te halen)")
+        return
+    split = args.split
+    print(f"FLEURS {split}.tsv ophalen …")
+    regels = audio_bron_bytes(f"{FLEURS}/{split}.tsv").decode("utf-8").splitlines()
+    # kolommen: id, bestand, tekst, genormaliseerd, tekens, samples, geslacht
+    bekend = set()
+    if WOORDENBOEK.exists():
+        with open(WOORDENBOEK, encoding="utf-8") as f:
+            bekend = {regel.split("\t", 1)[0] for regel in f}
+    kandidaten, per_zin = [], {}
+    rijen_tsv = [r.split("\t") for r in regels if r.strip()]
+    random.Random(args.seed).shuffle(rijen_tsv)
+    for r in rijen_tsv:
+        woorden = normaliseer(r[2]).split()
+        # Korte zinnen (dichter bij de testzinnen), zonder cijfers en met alleen woorden uit het
+        # uitspraakwoordenboek; per zin hooguit een paar sprekers, zodat er veel verschillende zinnen zijn.
+        if (per_zin.get(r[0], 0) >= args.per_zin or not 3 <= len(woorden) <= args.max_woorden
+                or re.search(r"\d", r[2]) or (bekend and any(w not in bekend for w in woorden))):
+            continue
+        per_zin[r[0]] = per_zin.get(r[0], 0) + 1
+        kandidaten.append(r)
+        if len(kandidaten) >= args.aantal:
+            break
+    gewenst = {r[1]: r for r in kandidaten}
+    print(f"{len(gewenst)} zinnen gekozen; audio ({split}.tar.gz, ±190 MB) doorlopen …")
+    req = urllib.request.Request(f"{FLEURS}/audio/{split}.tar.gz", headers={"User-Agent": UA})
+    rijen = []
+    if doelmap.exists():
+        shutil.rmtree(doelmap)
+    doelmap.mkdir(parents=True)
+    with urllib.request.urlopen(req, timeout=120) as resp, tarfile.open(fileobj=resp, mode="r|gz") as tar:
+        for lid in tar:
+            naam = Path(lid.name).name
+            if not lid.isfile() or naam not in gewenst:
+                continue
+            r = gewenst.pop(naam)
+            stam = veilige_naam(Path(naam).stem)
+            (doelmap / f"{stam}.wav").write_bytes(tar.extractfile(lid).read())
+            (doelmap / f"{stam}.txt").write_text(r[2].strip() + "\n", encoding="utf-8")
+            rijen.append({"naam": stam, "tekst": r[2].strip(), "zin_id": r[0],
+                          "geslacht": r[6] if len(r) > 6 else "", "licentie": "CC-BY-4.0",
+                          "bron": f"FLEURS sv_se {split} (google/fleurs)"})
+            if not gewenst:
+                break
+    schrijf_meta(bron_map, rijen)
+
+
 # ---------- willekeurige tabel ----------
 
 def kolom(rij, kop, naam_of_nr):
@@ -213,6 +276,13 @@ def tabel(args):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
+    f = sub.add_parser("fleurs")
+    f.add_argument("--aantal", type=int, default=40)
+    f.add_argument("--max-woorden", type=int, default=20)
+    f.add_argument("--per-zin", type=int, default=3, help="hooguit zoveel sprekers per zin")
+    f.add_argument("--split", default="dev", choices=["dev", "test", "train"])
+    f.add_argument("--seed", type=int, default=1)
+    f.add_argument("--opnieuw", action="store_true")
     for naam in ("commonvoice", "lingualibre", "tsv"):
         s = sub.add_parser(naam)
         s.add_argument("--per-woord", type=int, default=5)
@@ -235,7 +305,7 @@ def main():
                            help="alleen zinnen met een doelwoord (anders ook willekeurige zinnen)")
             s.add_argument("--max", type=int, default=50)
     args = p.parse_args()
-    {"commonvoice": commonvoice, "lingualibre": lingualibre, "tsv": tabel}[args.cmd](args)
+    {"commonvoice": commonvoice, "lingualibre": lingualibre, "tsv": tabel, "fleurs": fleurs}[args.cmd](args)
 
 
 if __name__ == "__main__":

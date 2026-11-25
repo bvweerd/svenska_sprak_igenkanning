@@ -32,36 +32,90 @@
   .bron { font-size: .8rem; color: var(--zacht); margin-left: .3rem; }
   pre { font-size: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
   #api span { margin-right: .6rem; }
+  :root { --letop: #b45309; }
+  #perwoord { font-size: 1.35rem; line-height: 2.1; margin: .4rem 0; }
+  #perwoord span { padding: .1rem .25rem; border-radius: .3rem; border-bottom: 3px solid transparent; }
+  #perwoord .goed { border-bottom-color: var(--goed); }
+  #perwoord .let_op { border-bottom-color: var(--letop); background: #b4530918; cursor: help; }
+  #perwoord .fout { border-bottom-color: var(--fout); background: #c6282818; cursor: help; }
+  #woorduitleg li.let_op::before { content: "!"; color: var(--letop); }
+  #woorduitleg b { margin-right: .3rem; }
+  .legenda span { margin-right: .7rem; }
+  .melding { border-left: 4px solid var(--letop); background: #b4530918; padding: .5rem .7rem;
+             border-radius: .3rem; margin-bottom: .7rem; font-size: .95rem; }
+  .rechts { margin-left: auto; }
+  .voortgang { justify-content: space-between; margin-top: -.25rem; }
+  .voortgang label { cursor: pointer; }
+  .verder { margin-top: 1rem; }
+  .verder #verder { flex: 1; font-weight: 600; padding: .7rem 1rem; }
+  kbd { font: .75rem ui-monospace, monospace; border: 1px solid var(--rand); border-radius: .25rem; padding: 0 .3rem; }
+  @media (hover: none) { .toetsen { display: none; } }   /* telefoon: geen toetsenbord */
+  #score { margin: .6rem 0 .2rem; }
+  #score .getal { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #score .balk { height: .5rem; border-radius: .25rem; background: var(--rand); overflow: hidden; margin: .3rem 0; }
+  #score .balk div { height: 100%; background: #2463eb; }
 </style>
 </head>
 <body>
 <h1>Proef uitspraak Zweeds</h1>
 <div class="klein" id="api">Analyses: …</div>
-
-<div class="rij">
-  <button id="vorige" aria-label="Vorige">‹</button>
-  <select id="kiezer" aria-label="Kies een zin"></select>
-  <button id="volgende" aria-label="Volgende">›</button>
+<div class="rij klein">
+  <label for="mic">Microfoon:</label>
+  <select id="mic" aria-label="Kies de microfoon"></select>
+  <button id="mic-test" title="Toestemming geven en het niveau 3 seconden testen">Test</button>
+</div>
+<div id="meter" class="klein" hidden>
+  <div class="balk" style="height:.4rem;border-radius:.2rem;background:var(--rand);overflow:hidden"><div id="meter-balk" style="height:100%;width:0;background:var(--goed)"></div></div>
+  <span id="meter-tekst"></span>
 </div>
 
-<div class="kaart">
+<div class="rij">
+  <button id="vorige" aria-label="Vorige zin" title="Vorige zin (←)">‹</button>
+  <select id="kiezer" aria-label="Kies een zin"></select>
+  <button id="volgende" aria-label="Volgende zin" title="Volgende zin (→)">›</button>
+</div>
+<div class="rij klein voortgang">
+  <span id="voortgang"></span>
+  <label><input type="checkbox" id="overslaan"> sla opgenomen zinnen over</label>
+</div>
+
+<div class="kaart" id="zinkaart">
+  <div class="klein" id="plaats"></div>
   <div id="zweeds">…</div>
   <div id="nederlands"></div>
   <div class="klein" id="meten"></div>
   <p id="opdracht"></p>
   <div class="rij">
-    <button id="opnemen" class="hoofd">⏺ Opnemen</button>
+    <button id="opnemen" class="hoofd" title="Opnemen / stoppen (spatie)">⏺ Opnemen</button>
     <button id="voorbeeld" title="Computerstem van de browser">🔊 Voorbeeld</button>
+    <button id="overslaan-knop" class="rechts" title="Volgende zin (→)">Overslaan ›</button>
   </div>
   <audio id="speler" controls hidden></audio>
   <div id="status"></div>
 </div>
 
 <div class="kaart" id="uitslag" hidden>
+  <div id="geluid" class="melding" hidden></div>
   <div id="oordeel"></div>
-  <ul id="lijst"></ul>
+  <div id="score" hidden>
+    <span class="getal" id="score-getal"></span> <span id="score-wat"></span>
+    <div class="balk"><div id="score-balk"></div></div>
+    <div id="score-niveau"></div>
+    <div class="klein" id="score-uitleg"></div>
+  </div>
+  <div id="woordblok" hidden>
+    <div id="perwoord"></div>
+    <div class="klein legenda"><span style="color:var(--goed)">▁ goed</span><span style="color:var(--letop)">▁ let op</span><span style="color:var(--fout)">▁ fout</span></div>
+    <ul id="woorduitleg"></ul>
+  </div>
+  <div class="rij verder">
+    <button id="opnieuw" title="Dezelfde zin nog eens opnemen (spatie)">↻ Opnieuw</button>
+    <button id="verder" class="hoofd" title="Volgende zin (→ of Enter)">Volgende zin ›</button>
+  </div>
+  <details><summary class="klein">Alle meldingen per analyse</summary><ul id="lijst"></ul></details>
   <details><summary class="klein">Ruwe resultaten</summary><pre id="ruw"></pre></details>
 </div>
+<p class="klein toetsen">Toetsen: <kbd>spatie</kbd> opnemen/stoppen · <kbd>→</kbd> volgende · <kbd>←</kbd> vorige</p>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -78,17 +132,50 @@ async function laad() {
     .map(([n, ok]) => `<span>${ok ? "🟢" : "🔴"} ${n}</span>`).join("");
 }
 
+// Leesbare namen voor de delen uit testzinnen.tsv (kolom 'deel', eerste letter).
+const DELEN = { A: "Woordaccent", B: "Klanken en lengte", C: "Proefzinnen", F: "Niveau A1", G: "Niveau A2",
+                T: "Leestekst", D: "Bewuste fouten" };
+const deelNaam = (z) => DELEN[z.deel[0]] || z.deel;
+const kort = (t) => t.length > 60 ? t.slice(0, 57) + "…" : t;
+
 function vulKiezer() {
-  $("kiezer").innerHTML = zinnen.map((z, i) =>
-    `<option value="${i}">${z.opgenomen ? "● " : "○ "}${z.id} – ${z.zweeds}</option>`).join("");
-  $("kiezer").value = plek;
+  const sel = $("kiezer");
+  sel.innerHTML = "";
+  let groep = null;
+  zinnen.forEach((z, i) => {
+    if (!groep || groep.label !== deelNaam(z)) {
+      groep = document.createElement("optgroup");
+      groep.label = deelNaam(z);
+      sel.append(groep);
+    }
+    groep.append(new Option(`${z.opgenomen ? "● " : "○ "}${z.id} – ${kort(z.zweeds)}`, i));
+  });
+  sel.value = plek;
+  const n = zinnen.filter((z) => z.opgenomen).length;
+  $("voortgang").textContent = `${n} van ${zinnen.length} opgenomen`;
+}
+
+function ga(stap) {
+  // Volgende of vorige zin; met 'overslaan' de eerstvolgende die nog niet is opgenomen.
+  if (recorder && recorder.state === "recording") return;
+  let i = plek;
+  for (let n = 0; n < zinnen.length; n++) {
+    i = (i + stap + zinnen.length) % zinnen.length;
+    if (!$("overslaan").checked || !zinnen[i].opgenomen) break;
+  }
+  plek = i; toon();
+  $("zinkaart").scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 function toon() {
   const z = zinnen[plek];
   location.hash = z.id;
   $("kiezer").value = plek;
+  const inDeel = zinnen.filter((x) => deelNaam(x) === deelNaam(z));
+  $("plaats").textContent = `${deelNaam(z)} · ${inDeel.indexOf(z) + 1} van ${inDeel.length}`
+    + (z.opgenomen ? " · al opgenomen" : "");
   $("zweeds").textContent = z.zweeds;
+  $("zweeds").style.fontSize = z.zweeds.length > 80 ? "1.15rem" : "";  // hele tekst (T08)
   $("nederlands").textContent = z.nederlands;
   $("meten").textContent = "Meet: " + z.wat_meten;
   const fout = z.opdracht.startsWith("FOUT");
@@ -98,8 +185,28 @@ function toon() {
 }
 
 $("kiezer").onchange = (e) => { plek = +e.target.value; toon(); };
-$("vorige").onclick = () => { plek = (plek + zinnen.length - 1) % zinnen.length; toon(); };
-$("volgende").onclick = () => { plek = (plek + 1) % zinnen.length; toon(); };
+$("vorige").onclick = () => ga(-1);
+$("volgende").onclick = () => ga(1);
+$("overslaan-knop").onclick = () => ga(1);
+$("verder").onclick = () => ga(1);
+$("opnieuw").onclick = () => { $("uitslag").hidden = true; $("opnemen").click(); };
+
+// Na een muisklik de focus van de knop halen, zodat de spatie daarna opnemen blijft (en niet die knop).
+document.querySelectorAll("button").forEach((b) => b.addEventListener("click", (e) => { if (e.detail) b.blur(); }));
+
+// 'Sla opgenomen zinnen over' onthouden in deze browser (lukt het niet, dan gewoon uit).
+try { $("overslaan").checked = localStorage.getItem("overslaan") === "1"; } catch (e) {}
+$("overslaan").onchange = (e) => { try { localStorage.setItem("overslaan", e.target.checked ? "1" : "0"); } catch (x) {} };
+
+// Toetsen: spatie = opnemen/stoppen, pijltjes = vorige/volgende, Enter na een uitslag = volgende.
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || /^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.target.tagName === "BUTTON" && (e.key === " " || e.key === "Enter")) return;  // knop met tab gekozen
+  if (e.key === " ") { e.preventDefault(); if (!$("opnemen").disabled) $("opnemen").click(); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); ga(1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); ga(-1); }
+  else if (e.key === "Enter" && !$("uitslag").hidden && e.target.tagName !== "BUTTON") ga(1);
+});
 
 $("voorbeeld").onclick = () => {
   const u = new SpeechSynthesisUtterance(zinnen[plek].zweeds);
@@ -115,21 +222,92 @@ function mimeType() {
   return "";
 }
 
+// ---------- microfoon kiezen en niveau tonen ----------
+let micInfo = null, meterStop = null;
+const micId = () => $("mic").value || "";
+
+async function vulMics(actief) {
+  // Namen van microfoons zijn pas zichtbaar na toestemming (na de eerste opname of 'Test').
+  const lijst = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+  const gekozen = actief || micId() || (() => { try { return localStorage.getItem("mic") || ""; } catch (e) { return ""; } })();
+  $("mic").innerHTML = "";
+  for (const d of lijst) {
+    const naam = d.label || "microfoon (naam na toestemming)";
+    $("mic").append(new Option(d.deviceId === "default" ? `Standaard van Windows – ${naam.replace(/^Default - |^Standaard - /, "")}` : naam, d.deviceId));
+  }
+  if (gekozen && lijst.some((d) => d.deviceId === gekozen)) $("mic").value = gekozen;
+}
+
+function startMeter(stream) {
+  const ctx = new AudioContext(), an = ctx.createAnalyser();
+  ctx.createMediaStreamSource(stream).connect(an);
+  const buf = new Float32Array(an.fftSize);
+  let piek = -100, loopt = true;
+  const stap = () => {
+    if (!loopt) return;
+    an.getFloatTimeDomainData(buf);
+    const rms = Math.sqrt(buf.reduce((s, x) => s + x * x, 0) / buf.length);
+    const db = 20 * Math.log10(rms + 1e-9);
+    piek = Math.max(piek, db);
+    $("meter-balk").style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + "%";
+    $("meter-tekst").textContent = `${Math.round(db)} dB (hoogste ${Math.round(piek)} dB)`;
+    requestAnimationFrame(stap);
+  };
+  stap();
+  $("meter").hidden = false;
+  meterStop = () => {
+    loopt = false; ctx.close();
+    // Advies na afloop: spraak hoort rond −20 dB te pieken; veel zachter = microfoon te ver of verkeerde microfoon.
+    $("meter-tekst").textContent = `hoogste niveau ${Math.round(piek)} dB` +
+      (piek < -30 ? " — erg zacht: kies je headset in de lijst of zet de microfoon harder" : "");
+    if (micInfo) micInfo.piek_db = Math.round(piek);
+  };
+}
+function stopMeter() { if (meterStop) meterStop(); meterStop = null; }
+
+$("mic").onchange = (e) => { try { localStorage.setItem("mic", e.target.value); } catch (x) {} };
+$("mic-test").onclick = async () => {
+  // Toestemming vragen zodat de namen verschijnen, en 3 seconden het niveau laten zien.
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: {
+      ...(micId() ? { deviceId: { exact: micId() } } : {}),
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const t = s.getAudioTracks()[0];
+    await vulMics(t.getSettings().deviceId);
+    micInfo = { naam: t.label, ...t.getSettings() };
+    startMeter(s);
+    $("status").textContent = `Test met: ${t.label} — zeg iets…`;
+    setTimeout(() => { stopMeter(); s.getTracks().forEach((x) => x.stop()); }, 3000);
+  } catch (e) { $("status").textContent = "Geen microfoon: " + e.message; }
+};
+if (navigator.mediaDevices) vulMics();
+
 $("opnemen").onclick = async () => {
   if (recorder && recorder.state === "recording") { recorder.stop(); return; }
   try {
     // Geen ruisonderdrukking of automatische versterking: die vervormen de klanken.
+    // De gekozen microfoon expliciet (anders pakt de browser de standaard van Windows, vaak de laptop).
     const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      ...(micId() ? { deviceId: { exact: micId() } } : {}),
       channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const track = stream.getAudioTracks()[0];
+    micInfo = { naam: track.label, ...track.getSettings() };
+    vulMics(track.getSettings().deviceId);
+    startMeter(stream);
     const type = mimeType();
     recorder = new MediaRecorder(stream, type ? { mimeType: type } : {});
     stukken = [];
     recorder.ondataavailable = (e) => e.data.size && stukken.push(e.data);
-    recorder.onstop = () => { stream.getTracks().forEach((t) => t.stop()); verstuur(); };
-    recorder.start();
-    $("opnemen").textContent = "⏹ Stop"; $("opnemen").className = "opname";
-    $("status").textContent = "Opnemen… wacht even, spreek, wacht even, druk op Stop.";
+    recorder.onstop = () => { stopMeter(); stream.getTracks().forEach((t) => t.stop()); verstuur(); };
+    // Een headset geeft bij het aanzetten een plof (±0,6 s): die niet mee-opnemen.
     $("uitslag").hidden = true;
+    $("opnemen").disabled = true; $("opnemen").textContent = "Microfoon aan…";
+    $("status").textContent = "Even wachten…";
+    await new Promise((r) => setTimeout(r, 700));
+    recorder.start();
+    $("opnemen").disabled = false;
+    $("opnemen").textContent = "⏹ Stop"; $("opnemen").className = "opname";
+    $("status").textContent = `🔴 Spreek nu (microfoon: ${micInfo.naam || "standaard"}). Druk daarna op Stop (of spatie).`;
   } catch (e) {
     $("status").textContent = "Geen microfoon: " + e.message +
       " (open de pagina via http://localhost:8080 of https)";
@@ -145,7 +323,8 @@ async function verstuur() {
   $("opnemen").disabled = true;
   try {
     const resp = await fetch("/api/opname?id=" + z.id, {
-      method: "POST", headers: { "Content-Type": blob.type }, body: blob });
+      method: "POST", body: blob,
+      headers: { "Content-Type": blob.type, "X-Microfoon": encodeURIComponent(JSON.stringify(micInfo || {})) } });
     const uit = await resp.json();
     if (!resp.ok) throw new Error(uit.fout || resp.status);
     toonUitslag(uit);
@@ -162,6 +341,12 @@ function toonUitslag(uit) {
   const tekst = { goed: "Goed", fout: "Nog niet goed", onbekend: "Geen oordeel" };
   $("oordeel").textContent = tekst[uit.oordeel];
   $("oordeel").className = uit.oordeel;
+  // Opnamekwaliteit: alleen melden als het de analyse waarschijnlijk verstoort.
+  const meldingen = (uit.feedback || []).filter((r) => r.bron === "opname").map((r) => r.tekst);
+  $("geluid").hidden = !meldingen.length;
+  $("geluid").textContent = "⚠ " + meldingen.join(" ");
+  toonScore(uit.score || {});
+  toonWoorden(uit.woorden || []);
   $("lijst").innerHTML = "";
   for (const r of uit.feedback) {
     const li = document.createElement("li");
@@ -174,6 +359,56 @@ function toonUitslag(uit) {
   }
   $("ruw").textContent = JSON.stringify(uit.resultaten, null, 1);
   $("uitslag").hidden = false;
+  $("uitslag").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+// De zin met per woord een kleur; daaronder wat er mis was bij de oranje en rode woorden.
+function toonWoorden(woorden) {
+  $("woordblok").hidden = !woorden.length;
+  $("perwoord").innerHTML = ""; $("woorduitleg").innerHTML = "";
+  const status = { goed: "goed", let_op: "let op", fout: "fout" };
+  woorden.forEach((w, i) => {
+    const s = document.createElement("span");
+    s.className = w.status; s.textContent = w.tekst;
+    if (w.uitleg.length) {
+      s.title = w.uitleg.join("\n");
+      s.onclick = () => document.getElementById("uitleg-" + i).scrollIntoView({ block: "nearest" });
+    }
+    $("perwoord").append(s, " ");
+    if (w.status === "goed") return;
+    const li = document.createElement("li");
+    li.id = "uitleg-" + i; li.className = w.status === "fout" ? "fout" : "let_op";
+    const b = document.createElement("b");
+    b.textContent = w.tekst.replace(/[.,!?;:]+$/, "");
+    li.append(b, `(${status[w.status]}) ` + w.uitleg.join(" · "));
+    $("woorduitleg").append(li);
+  });
+  if (woorden.length && woorden.every((w) => w.status === "goed")) {
+    const li = document.createElement("li");
+    li.className = "goed"; li.textContent = "Geen afwijkingen per woord gevonden.";
+    $("woorduitleg").append(li);
+  }
+}
+
+function toonScore(s) {
+  $("score").hidden = s.ruw == null;
+  if (s.ruw == null) return;
+  const namen = { klanken: "klanken", verstaan: "verstaan", uitspraak: "uitspraak" };
+  const delen = Object.entries(s.onderdelen || {}).map(([n, v]) => `${namen[n] || n} ${v}%`).join(" · ");
+  if (s.gelijkenis != null) {
+    $("score-getal").textContent = s.gelijkenis;
+    $("score-wat").textContent = `op de schaal ${s.nul || "Nederlands accent"} (0) → moedertaalspreker (100)`;
+    $("score-balk").style.width = Math.max(2, s.gelijkenis) + "%";
+    $("score-niveau").textContent = `Klinkt ${s.niveau}. Even hoog of hoger dan ${s.percentiel}% van de moedertaal-opnames.`;
+    $("score-uitleg").textContent = `${delen} · ruwe score ${s.ruw} · referentie: ${s.referentie}`;
+  } else {
+    // Nog geen ijking (batch nog niet gedraaid): alleen de ruwe score.
+    $("score-getal").textContent = Math.round(s.ruw);
+    $("score-wat").textContent = "ruwe score (0–100)";
+    $("score-balk").style.width = s.ruw + "%";
+    $("score-niveau").textContent = "Nog geen vergelijking met moedertaalsprekers: draai eerst ./proef/alles.sh.";
+    $("score-uitleg").textContent = delen;
+  }
 }
 
 laad();
