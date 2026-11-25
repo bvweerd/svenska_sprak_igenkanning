@@ -139,8 +139,8 @@
   <div id="tips"></div>
   <div id="luister" hidden>
     <h2>Luister en vergelijk</h2>
-    <div class="klein">Klik op een woord: eerst hoor je jezelf, dan het voorbeeld. Oranje en rood: daar viel iets op
-      (de uitleg verschijnt eronder).</div>
+    <div class="klein">Klik op een woord: eerst hoor je jezelf, dan het voorbeeld. Rood: daar gaan de tips
+      over. Oranje: daar hoorde één model iets, niet zeker. Klik voor de uitleg.</div>
     <div id="luisterwoorden"></div>
     <div id="woordinfo" class="klein" hidden></div>
     <div class="rij">
@@ -413,14 +413,40 @@ async function buffer(url) {
 }
 
 async function speel(url, van, tot) {
-  // Speelt (een stuk van) een opname af; wacht tot het klaar is. Iets ruimer dan de woordgrenzen van MFA.
+  // Speelt (een stuk van) een opname af; wacht tot het klaar is. De woordgrenzen van MFA zijn een paar
+  // honderdsten onzeker; daarom knippen we op het stilste moment vlak bij de grens, zodat er minder van de
+  // buurwoorden meekomt ("enpoi" bij "på"), met een korte fade tegen tikken.
   const b = await buffer(url);
   if (bron) { try { bron.stop(); } catch (e) {} }
   bron = audioCtx.createBufferSource();
-  bron.buffer = b; bron.connect(audioCtx.destination);
-  const start = Math.max(0, van ?? 0);
-  const duur = tot != null ? Math.min(b.duration - start, tot - start + 0.03) : undefined;
+  bron.buffer = b;
+  const gain = audioCtx.createGain();
+  bron.connect(gain); gain.connect(audioCtx.destination);
+  let start = 0, duur;
+  if (van != null && tot != null) {
+    // Alleen naar buiten schuiven: binnen een woord is de stilte vóór een p, t of k ook stil, en dan knip je het woord af.
+    start = stilsteMoment(b, van - 0.03, van);
+    const eind = stilsteMoment(b, tot, tot + 0.03);
+    duur = Math.min(b.duration - start, eind - start);
+    const nu = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0, nu);
+    gain.gain.linearRampToValueAtTime(1, nu + 0.01);
+    gain.gain.setValueAtTime(1, nu + Math.max(0.01, duur - 0.015));
+    gain.gain.linearRampToValueAtTime(0, nu + duur);
+  }
   await new Promise((klaar) => { bron.onended = klaar; bron.start(0, start, duur); });
+}
+
+function stilsteMoment(b, van, tot) {
+  // Het midden van het stilste stukje van 10 ms tussen van en tot (seconden).
+  const x = b.getChannelData(0), sr = b.sampleRate, n = Math.round(0.01 * sr), stap = Math.round(0.0025 * sr);
+  let best = Math.max(0, Math.min(b.duration, (van + tot) / 2)), laagst = Infinity;
+  for (let a = Math.max(0, Math.round(van * sr - n / 2)); a + n <= Math.min(x.length, Math.round(tot * sr + n / 2)); a += stap) {
+    let e = 0;
+    for (let k = a; k < a + n; k++) e += x[k] * x[k];
+    if (e < laagst) { laagst = e; best = (a + n / 2) / sr; }
+  }
+  return best;
 }
 
 async function vergelijk(i) {
@@ -432,9 +458,7 @@ async function vergelijk(i) {
   try {
     if (w.eigen) await speel(laatste.audio.eigen, ...w.eigen);
     await new Promise((r) => setTimeout(r, 300));
-    // Voorbeeld: het losse woord van de voorbeeldstem (schoon, zonder buurwoorden); anders het stukje uit de zin.
-    if (w.voorbeeld_woord) await speel(w.voorbeeld_woord);
-    else if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld);
+    if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld);
   } finally { knop && knop.classList.remove("actief"); }
 }
 
@@ -481,9 +505,12 @@ function toonLuister(uit) {
   (uit.woorden || []).forEach((w, i) => {
     const k = document.createElement("button");
     k.textContent = w.tekst;
-    // Kleur per woord (oranje = let op, rood = fout), dezelfde als onder 'Meer details'; blauw = staat in een tip.
-    k.className = [tipwoorden.has(i) ? "tipwoord" : "", w.status && w.status !== "goed" ? w.status : ""].join(" ").trim();
-    k.disabled = !w.eigen && !w.voorbeeld && !w.voorbeeld_woord;
+    // Rood alleen voor de woorden van de tips (die zijn door meerdere modellen bevestigd); oranje = er viel
+    // iets op (zie de uitleg), maar één model alleen zit er vaak naast. Te veel rood helpt niet.
+    // Een 'let op' (Whisper twijfelde even) krijgt geen kleur; de uitleg staat er wel bij.
+    const kleur = tipwoorden.has(i) ? "fout" : w.status === "fout" ? "let_op" : "";
+    k.className = [tipwoorden.has(i) ? "tipwoord" : "", kleur].join(" ").trim();
+    k.disabled = !w.eigen && !w.voorbeeld;
     k.onclick = () => { toonWoordinfo(w); vergelijk(i); };
     $("luisterwoorden").append(k, " ");
   });

@@ -12,7 +12,6 @@ WERK = DATA / "werk"                # tussenbestanden (niet in git)
 CORPUS = WERK / "corpus"            # 16 kHz mono wav + .lab per spreker, in MFA-vorm
 PIPER_RUW = WERK / "piper_ruw"      # Piper-uitvoer voor de omzetting
 ANKER_RUW = WERK / "anker_ruw"      # Zweedse zinnen voorgelezen met Nederlandse uitspraak (espeak-ng nl)
-VOORBEELD_WOORDEN = WERK / "voorbeeld_woorden"   # elk woord los ingesproken door de voorbeeldstem (MMS)
 MFA_UIT = WERK / "mfa"              # TextGrids van MFA
 RESULTATEN = DATA / "resultaten"    # CSV's en verslag
 

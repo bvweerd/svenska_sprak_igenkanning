@@ -12,7 +12,7 @@ import json
 import re
 from collections import Counter, defaultdict
 
-from proef_common import (CORPUS, MFA_UIT, VOORBEELD_WOORDEN, OPNAMES, SCORE_KLANKEN, WERK, bewerkingen, doel_variant, klank,
+from proef_common import (CORPUS, MFA_UIT, OPNAMES, SCORE_KLANKEN, WERK, bewerkingen, doel_variant, klank,
                           klank_oordeel, lees_klank_varianten, normaliseer)
 
 ARCHIEF = WERK / "web" / "archief"
@@ -211,13 +211,7 @@ def woordtijden(zin_id, r, res):
     eigen = [(w["start"], w["start"] + w["duur_ms"] / 1000, w["woord"])
              for w in res.get("mfa", {}).get("woorden", []) if w.get("woord")]
     voorbeeld = textgrid_woorden(MFA_UIT / "standaard" / "piper" / f"{zin_id}.TextGrid")
-    uit = [{"eigen": None, "voorbeeld": None, "voorbeeld_woord": None} for _ in weergave]
-    # Het losse woord van de voorbeeldstem, als het getoonde woord één woord is (niet 'idag' → 'i dag').
-    for k, w in enumerate(weergave):
-        n = normaliseer(w).split()
-        if len(n) == 1 and (VOORBEELD_WOORDEN / f"{n[0]}.wav").exists():
-            from urllib.parse import quote
-            uit[k]["voorbeeld_woord"] = f"/api/voorbeeldwoord/{quote(n[0])}"
+    uit = [{"eigen": None, "voorbeeld": None} for _ in weergave]
     for soort, lijst in (("eigen", eigen), ("voorbeeld", voorbeeld)):
         for k, t in enumerate(_tijden(verwacht, lijst) if lijst else []):
             if t and k < len(naar):
