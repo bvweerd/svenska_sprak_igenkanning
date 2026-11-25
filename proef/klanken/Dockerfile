@@ -11,6 +11,6 @@ ADD --chmod=755 https://raw.githubusercontent.com/MontrealCorpusTools/mfa-models
 # Zelfde aanvulling als in het MFA-image (namen uit de teksten).
 COPY common/extra_uitspraak.dict /tmp/
 RUN cat /tmp/extra_uitspraak.dict >> /modellen/swedish_mfa.dict
-COPY common/proef_common.py klanken/klanken.py ./
+COPY common/proef_common.py klanken/klanken.py klanken/voorbeeldstem.py ./
 ENV HF_HOME=/tmp/hf HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 CMD ["python", "klanken.py"]

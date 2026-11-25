@@ -30,15 +30,8 @@ def te_doen(map_, rijen):
 
 def main():
     rijen = zinnen()
-    PIPER_RUW.mkdir(parents=True, exist_ok=True)
-    doen, klaar = te_doen(PIPER_RUW, rijen)
-    if doen:
-        stem = PiperVoice.load(STEM)
-        for zin_id in doen:
-            with wave.open(str(PIPER_RUW / f"{zin_id}.wav"), "wb") as wf:
-                stem.synthesize_wav(rijen[zin_id]["zweeds"], wf)
-    klaar()
-    print(f"{len(doen)} zinnen (nieuw of gewijzigd) ingesproken in {PIPER_RUW}")
+    # De Zweedse voorbeeldstem doet sinds kort MMS (stap 'voorbeeld', klanken/voorbeeldstem.py): de Piper-stemmen
+    # zeggen de sj-klank vaak verkeerd. Deze stap maakt alleen nog het accent-anker.
 
     # Accent-ankerpunt: dezelfde zinnen met Nederlandse uitspraakregels (espeak-ng, stem 'nl').
     # Zo heeft de score een vast 0-punt ("duidelijk Nederlands accent") naast de moedertaalsprekers (100).

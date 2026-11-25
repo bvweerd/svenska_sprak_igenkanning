@@ -411,8 +411,8 @@ async function speel(url, van, tot) {
   if (bron) { try { bron.stop(); } catch (e) {} }
   bron = audioCtx.createBufferSource();
   bron.buffer = b; bron.connect(audioCtx.destination);
-  const start = Math.max(0, (van ?? 0) - 0.06);
-  const duur = tot != null ? Math.min(b.duration - start, tot - start + 0.1) : undefined;
+  const start = Math.max(0, (van ?? 0) - 0.03);
+  const duur = tot != null ? Math.min(b.duration - start, tot - start + 0.06) : undefined;
   await new Promise((klaar) => { bron.onended = klaar; bron.start(0, start, duur); });
 }
 
@@ -447,18 +447,24 @@ function toonTips(uit) {
     const d = document.createElement("div");
     d.className = "tip";
     d.innerHTML = `<b>${opmaak(t.titel)}${t.terugkerend ? '<span class="terug">komt vaker terug</span>' : ""}</b>${opmaak(t.uitleg)}`;
-    if (t.woord != null && uit.woorden[t.woord] && (uit.woorden[t.woord].eigen || uit.woorden[t.woord].voorbeeld)) {
+    // Eén luisterknop per betrokken woord (een gebundelde tip noemt er meerdere).
+    const nrs = (t.woorden || [t.woord]).filter((i) => i != null && uit.woorden[i] &&
+                                                     (uit.woorden[i].eigen || uit.woorden[i].voorbeeld));
+    if (nrs.length) d.append(document.createElement("br"));
+    for (const i of nrs) {
       const k = document.createElement("button");
-      k.textContent = `▶ Luister: „${uit.woorden[t.woord].tekst.replace(/[.,!?;:]+$/, "")}”`;
-      k.onclick = () => vergelijk(t.woord);
-      d.append(document.createElement("br"), k);
+      k.textContent = `▶ „${uit.woorden[i].tekst.replace(/[.,!?;:]+$/, "")}”`;
+      k.title = "Eerst jij, dan het voorbeeld";
+      k.style.marginRight = ".35rem";
+      k.onclick = () => vergelijk(i);
+      d.append(k);
     }
     $("tips").append(d);
   }
 }
 
 function toonLuister(uit) {
-  const tipwoorden = new Set((uit.tips || []).map((t) => t.woord));
+  const tipwoorden = new Set((uit.tips || []).flatMap((t) => t.woorden || [t.woord]));
   const kan = (uit.woorden || []).some((w) => w.eigen);
   $("luister").hidden = !kan;
   $("luisterwoorden").innerHTML = "";

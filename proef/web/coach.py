@@ -220,11 +220,18 @@ def woordtijden(zin_id, r, res):
     return uit
 
 
-def kies_tips(zin_id, r, res, toelichting, patronen=(), max_tips=2):
-    """Hoogstens twee tips, op volgorde van betrouwbaarheid. Elke tip: titel, uitleg, woord (nummer van het
-    getoonde woord, of None). toelichting: {(woord, variant): uitleg} uit varianten.tsv."""
+def max_tips_voor(n_woorden):
+    """Een zin: twee tips. Een langere tekst heeft meer ruimte voor fouten, dus meer tips (hoogstens vier)."""
+    return 2 if n_woorden <= 15 else 3 if n_woorden <= 40 else 4
+
+
+def kies_tips(zin_id, r, res, toelichting, patronen=(), max_tips=None):
+    """Tips op volgorde van betrouwbaarheid (twee bij een zin, meer bij een tekst). Elke tip: titel, uitleg,
+    woord (nummer van het getoonde woord, of None) en eventueel woorden (alle betrokken woorden).
+    toelichting: {(woord, variant): uitleg} uit varianten.tsv."""
     weergave, naar = _weergave(r)
     verwacht = normaliseer(r["zweeds"]).split()
+    max_tips = max_tips or max_tips_voor(len(verwacht))
     tips = []
 
     # 1. Whisper verstond iets anders (betrouwbaar voor weggelaten woorden en woordvolgorde).
@@ -248,6 +255,16 @@ def kies_tips(zin_id, r, res, toelichting, patronen=(), max_tips=2):
                              "uitleg": "Dit woord ontbrak of was te zacht. Spreek het duidelijk uit.",
                              "woord": naar[i] if i < len(naar) else None, "bron": "verstaan"})
             i += soort != "I"
+        # Meer dan twee woorden anders verstaan (vaak bij een tekst): samen in één tip, met alle woorden
+        # gemarkeerd om na te luisteren; zo blijft er ruimte voor klanktips.
+        anders = [t for t in tips if t["bron"] == "verstaan"]
+        if len(anders) > 2:
+            lijst = ", ".join(t["titel"].replace(" werd ", " als ").replace(" verstaan", "")
+                              .replace(" was niet te horen", " (niet gehoord)") for t in anders[:6])
+            tips = [{"titel": f"{len(anders)} woorden anders verstaan",
+                     "uitleg": f"Een Zweed verstond: {lijst}{' …' if len(anders) > 6 else ''}. Luister ze na bij "
+                               "„Luister en vergelijk” (blauw onderstreept) en zeg ze nog eens.",
+                     "woord": anders[0]["woord"], "woorden": [t["woord"] for t in anders], "bron": "verstaan"}]
 
     # 2. MFA: bij een doelwoord de verkeerde uitspraakvariant (bv. harde sk, lange a).
     for k in res.get("mfa", {}).get("keuze", []):
@@ -283,7 +300,7 @@ def kies_tips(zin_id, r, res, toelichting, patronen=(), max_tips=2):
                 woorden = ", ".join(f"„{pw[x]['woord']}”" for x in per_cat[cat][:3])
                 tips.append({"titel": titel, "uitleg": f"{uitleg} (in {woorden})", "woord": naar[k],
                              "bron": "klanken", "categorie": cat, "terugkerend": cat in terugkerend})
-    # Hoogstens twee, en niet twee keer hetzelfde woord.
+    # Hoogstens max_tips, en niet twee keer hetzelfde woord.
     gekozen, woorden = [], set()
     for t in tips:
         if t["woord"] in woorden and t["woord"] is not None:

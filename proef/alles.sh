@@ -7,7 +7,7 @@ mkdir -p werk resultaten opnames bronnen
 chmod a+rwx werk resultaten opnames
 dc() { docker compose --profile batch "$@"; }
 dc build
-[ "${1:-}" = "--zonder-piper" ] || dc run --rm piper
+[ "${1:-}" = "--zonder-piper" ] || { dc run --rm piper && dc run --rm voorbeeld; }   # accent-anker + voorbeeldstem
 # Moedertaalsprekers als ijkpunt voor de score (FLEURS, eenmalig ±190 MB; daarna overgeslagen).
 dc run --rm extern fleurs || echo "FLEURS ophalen mislukt: de score krijgt een voorlopige ijking (computerstem)."
 dc run --rm prep

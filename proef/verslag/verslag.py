@@ -216,7 +216,7 @@ def woord_oordeel_deel(out):
     pw = json.loads(KLANK_PER_WOORD.read_text(encoding="utf-8"))
     items = [(k.split("|")[0], k.split("|")[1], k.split("|")[2], v) for k, v in pw.items()]
     groepen = [("moedertaalsprekers (FLEURS)", lambda s_, i: s_.startswith(EXTERN)),
-               ("Piper (Zweedse computerstem)", lambda s_, i: s_ == "piper"),
+               ("Voorbeeldstem (MMS)", lambda s_, i: s_ == "piper"),
                ("Nederlands accent (anker)", lambda s_, i: s_ == ANKER),
                ("eigen opnames (ik)", lambda s_, i: s_ == "ik")]
     tab, criteria = [], []
@@ -260,7 +260,7 @@ def accenttest(out, rijen, ijking):
     out.append("\n### Accenttest\n\nDezelfde zinnen met Nederlandse uitspraakregels voorgelezen (espeak-ng `nl`, "
                "het 0-punt van de schaal) moeten duidelijk lager scoren dan moedertaalsprekers (100), en vrijwel "
                "nooit „als een moedertaalspreker” krijgen.\n\n")
-    groepen = {"moedertaalsprekers": lambda r: r["deel"] == "E", "Piper (Zweedse computerstem)": lambda r: r["spreker"] == "piper",
+    groepen = {"moedertaalsprekers": lambda r: r["deel"] == "E", "Voorbeeldstem (MMS)": lambda r: r["spreker"] == "piper",
                "Nederlands accent (anker)": lambda r: r["spreker"] == ANKER, "eigen opnames (ik)": lambda r: r["spreker"] == "ik"}
     tab, per_groep = [], {}
     for naam, f in groepen.items():
@@ -326,7 +326,7 @@ def score_deel(out, z, wh, kz, kl):
         ijking = maak_ijking(native, "moedertaalsprekers (" + ", ".join(bronnen) + ")", native_per, anker)
     else:
         piper = [r["ruw"] for r in rijen if r["spreker"] == "piper" and r["deel"] != "D" and r["ruw"] is not None]
-        ijking = maak_ijking(piper, "computerstem Piper (voorlopig: geen moedertaalsprekers)", native_per, anker)
+        ijking = maak_ijking(piper, "voorbeeldstem MMS (voorlopig: geen moedertaalsprekers)", native_per, anker)
     for r in rijen:
         r.update(vergelijk(r["ruw"], ijking))
     schrijf_csv(RESULTATEN / "score.csv", rijen, ["spreker", "id", "deel", "klanken", "verstaan", "uitspraak",

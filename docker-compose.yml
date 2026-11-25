@@ -85,6 +85,14 @@ services:
     volumes: *data
     profiles: [batch]
 
+  voorbeeld:                         # Zweedse voorbeeldstem (MMS-TTS), in het klanken-image
+    build: { context: ./proef, dockerfile: klanken/Dockerfile }
+    image: proef-sv/klanken
+    user: "1000:1000"
+    command: ["python", "voorbeeldstem.py"]
+    volumes: *data
+    profiles: [batch]
+
   prep:
     build: { context: ./proef, dockerfile: prep/Dockerfile }
     image: proef-sv/prep

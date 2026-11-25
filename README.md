@@ -40,13 +40,14 @@ alleen langs de zinnen te gaan die je nog niet hebt ingesproken. Je krijgt (`pro
 
 - **Eén oordeel in woorden**: „Uitstekend”, „Goed — goed verstaanbaar, met een licht accent”, „Redelijk” of
   „Oefen deze zin nog eens”, met een rustige balk (de score op de schaal hieronder).
-- **Hoogstens twee tips**, op volgorde van betrouwbaarheid: eerst wat Whisper anders verstond (betrouwbaar
+- **Tips** (twee bij een zin, drie of vier bij een langere tekst; meerdere anders verstane woorden samen in
+  één tip, allemaal blauw onderstreept om na te luisteren), op volgorde van betrouwbaarheid: eerst wat Whisper anders verstond (betrouwbaar
   voor weggelaten woorden en woordvolgorde), dan een fout bij een doelwoord volgens MFA, dan pas een
   klanktip. Klanktips komen uit een vaste lijst typische fouten van Nederlandstaligen (v klinkt als f, å
   klinkt als a, sj- en tj-klank, Zweedse u en y, o als oe, rs-klank, een „eh” vóór het woord) met een
   concrete instructie in Nederlandse klanken, zonder IPA. Een fout die in je opnames vaker terugkomt, gaat voor.
-- **Luister en vergelijk**: klik op een woord en je hoort eerst jezelf, dan de voorbeeldstem (Piper), aan de
-  hand van de woordtijden van MFA. Ook de knop Voorbeeld speelt nu de Piper-stem.
+- **Luister en vergelijk**: klik op een woord en je hoort eerst jezelf, dan de voorbeeldstem (MMS, zie
+  „Voorbeeldstem”), aan de hand van de woordtijden van MFA. Ook de knop Voorbeeld speelt die stem.
 - **Waar je aan kunt werken**: de klankfouten die over je laatste opname per zin het vaakst terugkomen (min.
   3 keer), want één klanktip zegt weinig en tien keer dezelfde fout wel.
 - **Eerdere opnames** onder elke zin (datum, oordeel, score; „?” = gemaakt vóór de microfoonkeuze, „test” =
@@ -143,6 +144,43 @@ door een Nederlandse moedertaalspreker ingesproken. Uitkomst en lessen:
 Omdat Zweeds het doel is, is de Nederlandse tak er daarna weer uitgehaald (scheelde een tweede Whisper-model,
 een extra download en veel taalafhankelijke code). De opnames staan nog in `werk/nl_controle/`.
 
+### Onderzocht: GOP met MFA (nog niet in gebruik)
+
+GOP (*goodness of pronunciation*): per klank hoe goed de opname past bij de verwachte klank, vergeleken met de
+best passende klank (per frame van 10 ms het verschil in log-likelihood, gemiddeld). MFA 3.4 heeft dit
+ingebouwd (`get_phone_confidences`), maar het Zweedse model mist het bestand dat modeltoestanden aan klanken
+koppelt, en MFA middelt over alle contextafhankelijke toestanden en telt toonvarianten (uː˧˩ / uː) als andere
+klanken. `proef/mfa/gop_proef.py` rekent het zelf uit met MFA's features en model: per klank de beste toestand,
+toon- en positievarianten samen. Gemeten op 42 opnames:
+
+- **Als totaalscore onbruikbaar**: moedertaal vs Nederlands accent per opname AUC 0,66 (de huidige score: 0,98).
+  GOP reageert sterk op microfoon en ruimte (de FLEURS-opnames scoren slechter dan de schone Piper-stem).
+- **Per klank veelbelovend**, omdat GOP ook zegt wát er gehoord werd: de bewust harde sk in D10 gaf bij de
+  sj-klank GOP 4,9 met „k” gehoord (bij de goede *skiner* in C08 niet opvallend), en de letterlijk
+  uitgesproken *stjärnor* (D09) „t” in plaats van sj.
+
+Daarna ingebouwd geprobeerd als snelle controle per opname (`proef/mfa/gop.py`, via kalpy zoals `mfa align_one`):
+zonder sprekeradaptatie is het te onbetrouwbaar (bij moedertaalsprekers werd de sj-klank in 83% van de gevallen
+niet als sj-achtig gehoord; je goede *skiner* in C08 klonk „k”). **Niet in gebruik**; het module blijft als
+onderzoeksgereedschap.
+
+### Voorbeeldstem
+
+De voorbeelden (knop Voorbeeld en „Luister en vergelijk”) komen van **Meta MMS-TTS Zweeds**
+(`facebook/mms-tts-swe`, CC BY-NC 4.0; stap `voorbeeld`, `proef/klanken/voorbeeldstem.py`). Eerst was dat Piper,
+maar alle Piper-stemmen leerden Zweeds via espeak-klanksymbolen (die schrijven de sj-klank als „s”+„x”) en
+zeggen juist de sj-klank vaak verkeerd. Gemeten met Whisper op 14 zinnen met 23 sj/tj-woorden:
+
+| stem | sj/tj-woorden goed verstaan | WER |
+|---|---|---|
+| **MMS** | **20/23** | 0,10 |
+| Piper sv_SE-lisa | 12/23 | 0,11 |
+| Piper sv_SE-nst (eerst gebruikt) | 10/23 | 0,14 |
+| Piper sv_SE-alma | 8/23 | 0,16 |
+
+Ook MMS is een computerstem: hij is een betere, niet een volmaakte voorbeeldspreker. De opnames heten om
+historische redenen nog `werk/piper_ruw` en spreker `piper`.
+
 ### Snelheid
 
 Alles draait op de CPU. De batch analyseert **alleen nieuwe of gewijzigde opnames**: elke stap (prep, whisper,
@@ -157,7 +195,7 @@ duurt ±24 minuten, een run zonder wijzigingen ±40 seconden.
   op minder opnames, dus een uitlijning kan iets anders uitvallen dan bij een volledige run.
 
 Verder: Whisper alleen in maat `small` (die gebruikt de score; zet `WHISPER_MODELLEN` in `docker-compose.yml`
-op `"tiny base small"` om maten te vergelijken), Piper en het accent-anker alleen voor nieuwe of gewijzigde
+op `"tiny base small"` om maten te vergelijken), de voorbeeldstem en het accent-anker alleen voor nieuwe of gewijzigde
 zinnen (`_teksten.json` in `werk/piper_ruw` en `werk/anker_ruw`), en FLEURS maar één keer ophalen.
 
 ### Moedertaalsprekers: wordt een Zweed onterecht afgekeurd?
