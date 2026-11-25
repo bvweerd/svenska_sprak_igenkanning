@@ -6,6 +6,7 @@ Feedback in lagen: eerst het oordeel (verstaan? goede uitspraakvariant gekozen?)
 """
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -16,6 +17,7 @@ from urllib.parse import parse_qs, urlparse
 
 from proef_common import (klank_oordeel, lees_klank_varianten, KLANK_MODELLEN, OPNAMES, SCORE_KLANKEN, WERK, bewerkingen, doel_variant, lees_ijking,
                           normaliseer, ruwe_score, score_onderdelen, vergelijk, zet_om, zinnen)
+from coach import ARCHIEF, eindoordeel, geschiedenis, kies_tips, oude_analyse, patronen, voorbeeld_wav, woordtijden
 
 API = {
     "whisper": os.environ.get("WHISPER_API", "http://whisper-api:8001"),
@@ -180,7 +182,24 @@ class Handler(BaseHTTPRequestHandler):
             self._stuur(200, (HIER / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif pad == "/api/zinnen":
             opgenomen = {p.stem.upper() for p in OPNAMES.glob("*.*")}
-            self._stuur(200, [dict(r, opgenomen=i in opgenomen) for i, r in zinnen().items()])
+            self._stuur(200, [dict(r, opgenomen=i in opgenomen, voorbeeld=voorbeeld_wav(i) is not None)
+                              for i, r in zinnen().items()])
+        elif pad == "/api/patronen":
+            self._stuur(200, patronen())
+        elif m := re.fullmatch(r"/api/geschiedenis/([A-Z]\d\d)", pad):
+            self._stuur(200, geschiedenis(m.group(1)))
+        elif m := re.fullmatch(r"/api/analyse/([A-Z]\d\d-\d{8}-\d{6})", pad):
+            # Een eerdere opname terugkijken: de bewaarde analyse, aangevuld met de nieuwere feedbacklaag.
+            if not (ARCHIEF / f"{m.group(1)}.json").exists():
+                return self._stuur(404, {"fout": "geen analyse"})
+            self._stuur(200, oude_analyse(m.group(1), zinnen().get(m.group(1)[:3]), TOELICHTING))
+        elif m := re.fullmatch(r"/api/audio/([A-Z]\d\d-\d{8}-\d{6}(?:-16k)?\.wav)", pad):
+            # Je eigen opname (schoongemaakt, 16 kHz): de woordtijden van MFA horen bij dit bestand.
+            f = ARCHIEF / m.group(1)
+            self._stuur(200, f.read_bytes(), "audio/wav") if f.exists() else self._stuur(404, {"fout": "geen opname"})
+        elif m := re.fullmatch(r"/api/voorbeeld/([A-Z]\d\d)", pad):
+            f = voorbeeld_wav(m.group(1))
+            self._stuur(200, f.read_bytes(), "audio/wav") if f else self._stuur(404, {"fout": "geen voorbeeld"})
         elif pad == "/api/status":
             uit = {}
             for naam, url in API.items():
@@ -252,7 +271,22 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001 — per woord is extra; de rest van de uitslag gaat voor
             print("woord_oordeel mislukt:", repr(e), flush=True)
             woorden = []
-        uit = {"id": zin_id, "oordeel": oordeel, "score": score, "woorden": woorden, "feedback": regels,
+        # Gebruikersvriendelijke laag (coach.py): één oordeel in woorden, hoogstens twee tips, woordtijden om
+        # te luisteren en vergelijken, en terugkerende patronen over je opnames.
+        try:
+            pat = patronen()
+            tips = kies_tips(zin_id, rijen[zin_id], res, TOELICHTING, pat)
+            tijden = woordtijden(zin_id, rijen[zin_id], res)
+            if len(tijden) == len(woorden):
+                woorden = [dict(w, **t) for w, t in zip(woorden, tijden)]
+        except Exception as e:  # noqa: BLE001 — de coachlaag is extra; de rest van de uitslag gaat voor
+            print("coach mislukt:", repr(e), flush=True)
+            pat, tips = [], []
+        kop, zin, soort = eindoordeel(score, wh if "fout" not in wh else None, tips)
+        uit = {"id": zin_id, "oordeel": oordeel, "eindoordeel": {"kop": kop, "zin": zin, "soort": soort},
+               "tips": tips, "patronen": pat, "score": score, "woorden": woorden, "feedback": regels,
+               "audio": {"eigen": f"/api/audio/{wav.name}",
+                         "voorbeeld": f"/api/voorbeeld/{zin_id}" if voorbeeld_wav(zin_id) else None},
                "geluid": geluid, "microfoon": microfoon, "resultaten": res,
                "sec": round(time.perf_counter() - t0, 1)}
         (archief / f"{zin_id}-{stempel}.json").write_text(json.dumps(uit, ensure_ascii=False, indent=1),

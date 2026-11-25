@@ -2,9 +2,15 @@
 
 Proef met lokale modellen (Docker) voor Zweedse spraakherkenning en uitspraakcontrole, met als doel op termijn
 spreekopdrachten in de oefensite. `PLAN.md` beschrijft kandidaten, opzet en criteria; `testzinnen.tsv` wat er
-ingesproken wordt: losse woorden en proefzinnen (A–C), zinnen op niveau A1 (F) en A2 (G), een korte
-leestekst (T: per zin en in zijn geheel), en bewuste fouten (D). Namen die niet in het uitspraakwoordenboek
-staan (zoals Fleur) gaan in `proef/common/extra_uitspraak.dict`.
+ingesproken wordt: proefzinnen (C), zinnen op niveau A1 (F) en A2 (G), een korte leestekst (T: per zin en in
+zijn geheel), 16 oefenteksten (L) en bewuste fouten (D). Losse woorden zijn er weer uit: zonder zin eromheen
+zijn Whisper en de klankherkenner onbetrouwbaar (*sju* werd „Ja”, *sol* „Så”), dus geen goede training. Namen
+die niet in het uitspraakwoordenboek staan (zoals Fleur, Bram, Wilma) gaan in `proef/common/extra_uitspraak.dict`.
+
+De oefenteksten (L01–L16) zijn de eerste „makkelijk lezen”-tekst zonder cijfers uit hoofdstuk 1–16 van
+[Svenska övningar](https://github.com/bvweerd/svenska_ovningar) (A1–A2) en
+[Svenska övningar B](https://github.com/bvweerd/svenska_ovningar_b) (B1), onveranderd overgenomen;
+licentie CC BY-NC-SA 4.0.
 
 ## Op de pc
 
@@ -30,8 +36,23 @@ via het IP-adres). **Kies eerst bovenaan je microfoon** (druk op Test voor toest
 zonder keuze pakt de browser de standaard van Windows, vaak de laptopmicrofoon, en dan zijn de scores
 onbruikbaar (zie „Opnamekwaliteit”). Kies een zin, druk op Opnemen, spreek, druk op Stop; daarna **Volgende zin ›**. Met het
 toetsenbord: spatie = opnemen/stoppen, → en ← = volgende/vorige zin. Vink „sla opgenomen zinnen over” aan om
-alleen langs de zinnen te gaan die je nog niet hebt ingesproken. Je krijgt:
+alleen langs de zinnen te gaan die je nog niet hebt ingesproken. Je krijgt (`proef/web/coach.py`):
 
+- **Eén oordeel in woorden**: „Uitstekend”, „Goed — goed verstaanbaar, met een licht accent”, „Redelijk” of
+  „Oefen deze zin nog eens”, met een rustige balk (de score op de schaal hieronder).
+- **Hoogstens twee tips**, op volgorde van betrouwbaarheid: eerst wat Whisper anders verstond (betrouwbaar
+  voor weggelaten woorden en woordvolgorde), dan een fout bij een doelwoord volgens MFA, dan pas een
+  klanktip. Klanktips komen uit een vaste lijst typische fouten van Nederlandstaligen (v klinkt als f, å
+  klinkt als a, sj- en tj-klank, Zweedse u en y, o als oe, rs-klank, een „eh” vóór het woord) met een
+  concrete instructie in Nederlandse klanken, zonder IPA. Een fout die in je opnames vaker terugkomt, gaat voor.
+- **Luister en vergelijk**: klik op een woord en je hoort eerst jezelf, dan de voorbeeldstem (Piper), aan de
+  hand van de woordtijden van MFA. Ook de knop Voorbeeld speelt nu de Piper-stem.
+- **Waar je aan kunt werken**: de klankfouten die over je laatste opname per zin het vaakst terugkomen (min.
+  3 keer), want één klanktip zegt weinig en tien keer dezelfde fout wel.
+- **Eerdere opnames** onder elke zin (datum, oordeel, score; „?” = gemaakt vóór de microfoonkeuze, „test” =
+  testbestand). Klik erop om die analyse terug te kijken, met tips en luisteren per woord. De score van oude
+  opnames wordt op de huidige schaal herberekend, zodat oud en nieuw vergelijkbaar zijn.
+- Onder **Meer details** (ingeklapt) de rest:
 - **Score**: waar je zit op de schaal Nederlands accent (0) → moedertaalspreker (100), met een niveau (zie hieronder).
 - **Per woord**: de zin met elk woord groen (goed), oranje (let op) of rood (fout), en daaronder wat er
   mis was: welke klank anders klonk (bv. „sj-klank [ɧ] klonk als k”), welk woord Whisper anders verstond of

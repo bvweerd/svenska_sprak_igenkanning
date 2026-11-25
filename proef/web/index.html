@@ -54,6 +54,31 @@
   #score .getal { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   #score .balk { height: .5rem; border-radius: .25rem; background: var(--rand); overflow: hidden; margin: .3rem 0; }
   #score .balk div { height: 100%; background: #2463eb; }
+  /* gebruikersvriendelijke laag: oordeel, tips, luisteren, patronen */
+  .eind-kop { font-size: 1.35rem; font-weight: 700; }
+  .eind.top .eind-kop, .eind.goed .eind-kop { color: var(--goed); }
+  .eind.redelijk .eind-kop { color: var(--letop); }
+  .eind.zwak .eind-kop { color: var(--fout); }
+  .schaal { height: .45rem; border-radius: .25rem; background: var(--rand); overflow: hidden; margin: .5rem 0 .2rem; }
+  .schaal div { height: 100%; background: var(--goed); transition: width .4s; }
+  .eind.redelijk .schaal div { background: var(--letop); } .eind.zwak .schaal div { background: var(--fout); }
+  .tip { border: 1px solid var(--rand); border-left: 4px solid #2463eb; border-radius: .4rem; padding: .6rem .75rem; margin: .6rem 0; }
+  .tip b { display: block; margin-bottom: .2rem; }
+  .tip button { margin-top: .4rem; font-size: .9rem; padding: .3rem .6rem; }
+  .tip .terug { font-size: .8rem; color: var(--zacht); margin-left: .4rem; }
+  #luisterwoorden { font-size: 1.25rem; line-height: 2; margin: .3rem 0; }
+  #luisterwoorden button { font: inherit; padding: .05rem .3rem; border: 0; border-bottom: 2px dotted var(--rand);
+                           border-radius: .25rem; background: none; color: inherit; }
+  #luisterwoorden button.tipwoord { border-bottom: 2px solid #2463eb; }
+  #luisterwoorden button.actief, #luisterwoorden button:hover { background: #2463eb22; }
+  h2 { font-size: 1rem; margin: 0 0 .4rem; }
+  #patronenlijst li::before { content: "•"; color: #2463eb; }
+  #historie { margin-top: .6rem; }
+  #historielijst { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .3rem; }
+  #historielijst button { font-size: .8rem; padding: .2rem .5rem; color: inherit; }
+  #historielijst button.gekozen { border-color: #2463eb; background: #2463eb22; }
+  #historielijst .k-top, #historielijst .k-goed { color: var(--goed); }
+  #historielijst .k-redelijk { color: var(--letop); } #historielijst .k-zwak { color: var(--fout); }
 </style>
 </head>
 <body>
@@ -87,16 +112,41 @@
   <p id="opdracht"></p>
   <div class="rij">
     <button id="opnemen" class="hoofd" title="Opnemen / stoppen (spatie)">⏺ Opnemen</button>
-    <button id="voorbeeld" title="Computerstem van de browser">🔊 Voorbeeld</button>
+    <button id="voorbeeld" title="Zweedse voorbeeldstem">🔊 Voorbeeld</button>
     <button id="overslaan-knop" class="rechts" title="Volgende zin (→)">Overslaan ›</button>
   </div>
   <audio id="speler" controls hidden></audio>
   <div id="status"></div>
+  <div id="historie" class="klein" hidden>
+    <div>Eerdere opnames (klik om terug te kijken):</div>
+    <div id="historielijst"></div>
+  </div>
 </div>
 
 <div class="kaart" id="uitslag" hidden>
+  <div id="uitslag-tijd" class="klein"></div>
   <div id="geluid" class="melding" hidden></div>
-  <div id="oordeel"></div>
+  <div id="eind" class="eind">
+    <div class="eind-kop" id="eind-kop"></div>
+    <div id="eind-zin"></div>
+    <div class="schaal" title="Nederlands accent ← → moedertaalspreker"><div id="eind-balk"></div></div>
+  </div>
+  <div id="tips"></div>
+  <div id="luister" hidden>
+    <h2>Luister en vergelijk</h2>
+    <div class="klein">Klik op een woord: eerst hoor je jezelf, dan het voorbeeld.</div>
+    <div id="luisterwoorden"></div>
+    <div class="rij">
+      <button id="hele-eigen">▶ Jouw opname</button>
+      <button id="hele-voorbeeld">▶ Voorbeeld</button>
+    </div>
+  </div>
+  <div class="rij verder">
+    <button id="opnieuw" title="Dezelfde zin nog eens opnemen (spatie)">↻ Opnieuw</button>
+    <button id="verder" class="hoofd" title="Volgende zin (→ of Enter)">Volgende zin ›</button>
+  </div>
+  <details><summary class="klein">Meer details</summary>
+  <div id="oordeel" class="klein"></div>
   <div id="score" hidden>
     <span class="getal" id="score-getal"></span> <span id="score-wat"></span>
     <div class="balk"><div id="score-balk"></div></div>
@@ -108,12 +158,14 @@
     <div class="klein legenda"><span style="color:var(--goed)">▁ goed</span><span style="color:var(--letop)">▁ let op</span><span style="color:var(--fout)">▁ fout</span></div>
     <ul id="woorduitleg"></ul>
   </div>
-  <div class="rij verder">
-    <button id="opnieuw" title="Dezelfde zin nog eens opnemen (spatie)">↻ Opnieuw</button>
-    <button id="verder" class="hoofd" title="Volgende zin (→ of Enter)">Volgende zin ›</button>
-  </div>
   <details><summary class="klein">Alle meldingen per analyse</summary><ul id="lijst"></ul></details>
   <details><summary class="klein">Ruwe resultaten</summary><pre id="ruw"></pre></details>
+  </details>
+</div>
+<div class="kaart" id="patronen" hidden>
+  <h2>Waar je aan kunt werken</h2>
+  <ul id="patronenlijst"></ul>
+  <div class="klein" id="patronen-bron"></div>
 </div>
 <p class="klein toetsen">Toetsen: <kbd>spatie</kbd> opnemen/stoppen · <kbd>→</kbd> volgende · <kbd>←</kbd> vorige</p>
 
@@ -127,13 +179,14 @@ async function laad() {
   const i = zinnen.findIndex((z) => z.id === hash);
   plek = i >= 0 ? i : Math.max(0, zinnen.findIndex((z) => !z.opgenomen));
   vulKiezer(); toon();
+  fetch("/api/patronen").then((r) => r.json()).then(toonPatronen).catch(() => {});
   const st = await (await fetch("/api/status")).json();
   $("api").innerHTML = "Analyses: " + Object.entries(st)
     .map(([n, ok]) => `<span>${ok ? "🟢" : "🔴"} ${n}</span>`).join("");
 }
 
 // Leesbare namen voor de delen uit testzinnen.tsv (kolom 'deel', eerste letter).
-const DELEN = { A: "Woordaccent", B: "Klanken en lengte", C: "Proefzinnen", F: "Niveau A1", G: "Niveau A2",
+const DELEN = { C: "Proefzinnen", F: "Niveau A1", G: "Niveau A2", L: "Oefenteksten (Svenska övningar)",
                 T: "Leestekst", D: "Bewuste fouten" };
 const deelNaam = (z) => DELEN[z.deel[0]] || z.deel;
 const kort = (t) => t.length > 60 ? t.slice(0, 57) + "…" : t;
@@ -182,6 +235,7 @@ function toon() {
   $("opdracht").textContent = fout ? z.opdracht : "Spreek het zo goed mogelijk uit.";
   $("opdracht").className = fout ? "fout" : "";
   $("speler").hidden = true; $("uitslag").hidden = true; $("status").textContent = "";
+  laadHistorie(z.id);
 }
 
 $("kiezer").onchange = (e) => { plek = +e.target.value; toon(); };
@@ -208,8 +262,11 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "Enter" && !$("uitslag").hidden && e.target.tagName !== "BUTTON") ga(1);
 });
 
-$("voorbeeld").onclick = () => {
-  const u = new SpeechSynthesisUtterance(zinnen[plek].zweeds);
+$("voorbeeld").onclick = async () => {
+  // Liefst de Zweedse voorbeeldstem (Piper, uit de batch); anders de computerstem van de browser.
+  const z = zinnen[plek];
+  if (z.voorbeeld) { try { await speel("/api/voorbeeld/" + z.id); return; } catch (e) { /* val terug */ } }
+  const u = new SpeechSynthesisUtterance(z.zweeds);
   u.lang = "sv-SE";
   const stem = speechSynthesis.getVoices().find((v) => v.lang.replace("_", "-").startsWith("sv"));
   if (stem) u.voice = stem;
@@ -329,6 +386,7 @@ async function verstuur() {
     if (!resp.ok) throw new Error(uit.fout || resp.status);
     toonUitslag(uit);
     z.opgenomen = true; vulKiezer();
+    laadHistorie(z.id);
     $("status").textContent = `Klaar in ${uit.sec} s. Opgeslagen als opnames/${z.id}.`;
   } catch (e) {
     $("status").textContent = "Mislukt: " + e.message;
@@ -337,10 +395,140 @@ async function verstuur() {
   }
 }
 
+// ---------- luisteren: eigen opname en voorbeeld, per woord ----------
+let audioCtx = null, laatste = null, bron = null;
+const buffers = {};
+
+async function buffer(url) {
+  audioCtx = audioCtx || new AudioContext();
+  if (!buffers[url]) buffers[url] = audioCtx.decodeAudioData(await (await fetch(url)).arrayBuffer());
+  return buffers[url];
+}
+
+async function speel(url, van, tot) {
+  // Speelt (een stuk van) een opname af; wacht tot het klaar is. Iets ruimer dan de woordgrenzen van MFA.
+  const b = await buffer(url);
+  if (bron) { try { bron.stop(); } catch (e) {} }
+  bron = audioCtx.createBufferSource();
+  bron.buffer = b; bron.connect(audioCtx.destination);
+  const start = Math.max(0, (van ?? 0) - 0.06);
+  const duur = tot != null ? Math.min(b.duration - start, tot - start + 0.1) : undefined;
+  await new Promise((klaar) => { bron.onended = klaar; bron.start(0, start, duur); });
+}
+
+async function vergelijk(i) {
+  // Eerst je eigen woord, korte pauze, dan hetzelfde woord van de voorbeeldstem.
+  const w = laatste && laatste.woorden[i];
+  if (!w) return;
+  const knop = $("luisterwoorden").children[i];
+  knop && knop.classList.add("actief");
+  try {
+    if (w.eigen) await speel(laatste.audio.eigen, ...w.eigen);
+    await new Promise((r) => setTimeout(r, 300));
+    if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld);
+  } finally { knop && knop.classList.remove("actief"); }
+}
+
+// *woord* in uitleg → cursief; de rest als gewone tekst.
+const opmaak = (t) => t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))
+                       .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+function toonEind(uit) {
+  const e = uit.eindoordeel || {}, s = uit.score || {};
+  $("eind").className = "eind " + (e.soort || "");
+  $("eind-kop").textContent = e.kop || "";
+  $("eind-zin").textContent = e.zin || "";
+  $("eind-balk").style.width = Math.max(3, s.gelijkenis ?? 0) + "%";
+}
+
+function toonTips(uit) {
+  $("tips").innerHTML = "";
+  for (const t of uit.tips || []) {
+    const d = document.createElement("div");
+    d.className = "tip";
+    d.innerHTML = `<b>${opmaak(t.titel)}${t.terugkerend ? '<span class="terug">komt vaker terug</span>' : ""}</b>${opmaak(t.uitleg)}`;
+    if (t.woord != null && uit.woorden[t.woord] && (uit.woorden[t.woord].eigen || uit.woorden[t.woord].voorbeeld)) {
+      const k = document.createElement("button");
+      k.textContent = `▶ Luister: „${uit.woorden[t.woord].tekst.replace(/[.,!?;:]+$/, "")}”`;
+      k.onclick = () => vergelijk(t.woord);
+      d.append(document.createElement("br"), k);
+    }
+    $("tips").append(d);
+  }
+}
+
+function toonLuister(uit) {
+  const tipwoorden = new Set((uit.tips || []).map((t) => t.woord));
+  const kan = (uit.woorden || []).some((w) => w.eigen);
+  $("luister").hidden = !kan;
+  $("luisterwoorden").innerHTML = "";
+  (uit.woorden || []).forEach((w, i) => {
+    const k = document.createElement("button");
+    k.textContent = w.tekst;
+    if (tipwoorden.has(i)) k.className = "tipwoord";
+    k.disabled = !w.eigen && !w.voorbeeld;
+    k.onclick = () => vergelijk(i);
+    $("luisterwoorden").append(k, " ");
+  });
+  $("hele-eigen").onclick = () => speel(uit.audio.eigen);
+  $("hele-voorbeeld").hidden = !uit.audio.voorbeeld;
+  $("hele-voorbeeld").onclick = () => speel(uit.audio.voorbeeld);
+}
+
+function toonPatronen(pat) {
+  $("patronen").hidden = !pat || !pat.length;
+  $("patronenlijst").innerHTML = "";
+  for (const p of pat || []) {
+    const li = document.createElement("li");
+    li.innerHTML = `<b>${opmaak(p.titel)}</b> — ${p.aantal}× (${p.voorbeelden.map((w) => `<em>${opmaak(w)}</em>`).join(", ")})<br>` +
+                   `<span class="klein">${opmaak(p.uitleg)}</span>`;
+    $("patronenlijst").append(li);
+  }
+  if (pat && pat.length) $("patronen-bron").textContent = `Op basis van je laatste opname van ${pat[0].opnames} zinnen.`;
+}
+
+// ---------- eerdere opnames terugkijken ----------
+const KOPKLASSE = { "Uitstekend": "k-top", "Goed": "k-goed", "Redelijk": "k-redelijk", "Oefen deze zin nog eens": "k-zwak" };
+
+async function laadHistorie(zinId, gekozen) {
+  let lijst = [];
+  try { lijst = await (await fetch("/api/geschiedenis/" + zinId)).json(); } catch (e) {}
+  if (zinnen[plek].id !== zinId) return;          // intussen naar een andere zin gegaan
+  $("historie").hidden = !lijst.length;
+  $("historielijst").innerHTML = "";
+  for (const h of lijst) {
+    const k = document.createElement("button");
+    const extra = h.test ? " · test" : !h.microfoon ? " · ?" : "";
+    k.innerHTML = `${h.tijd} · <span class="${KOPKLASSE[h.kop] || ""}">${h.kop}</span>` +
+                  (h.schaal != null ? ` (${h.schaal})` : "") + extra;
+    k.title = h.test ? "Testbestand (bv. de computerstem), geen opname via de browser"
+            : `Microfoon: ${h.microfoon || "onbekend (gemaakt vóór de microfoonkeuze, waarschijnlijk de laptop)"}`;
+    if (h.naam === gekozen) k.className = "gekozen";
+    k.onclick = () => bekijk(h.naam);
+    $("historielijst").append(k);
+  }
+}
+
+async function bekijk(naam) {
+  $("status").textContent = "Analyse ophalen…";
+  try {
+    const d = await (await fetch("/api/analyse/" + naam)).json();
+    if (d.fout) throw new Error(d.fout);
+    toonUitslag(d);
+    $("uitslag-tijd").textContent = `Eerdere opname van ${d.tijd}` +
+      (d.microfoon && d.microfoon.naam ? ` · ${d.microfoon.naam}` : " · microfoon onbekend");
+    $("status").textContent = "";
+    [...$("historielijst").children].forEach((b) => b.classList.toggle("gekozen", b.onclick && b.textContent.startsWith(d.tijd)));
+  } catch (e) { $("status").textContent = "Kon de analyse niet ophalen: " + e.message; }
+}
+
 function toonUitslag(uit) {
-  const tekst = { goed: "Goed", fout: "Nog niet goed", onbekend: "Geen oordeel" };
+  laatste = uit;
+  $("uitslag-tijd").textContent = "";
+  toonEind(uit); toonTips(uit); toonLuister(uit);
+  if (uit.patronen) toonPatronen(uit.patronen);
+  const tekst = { goed: "Analyses: goed", fout: "Analyses: niet alles goed", onbekend: "Geen oordeel" };
   $("oordeel").textContent = tekst[uit.oordeel];
-  $("oordeel").className = uit.oordeel;
   // Opnamekwaliteit: alleen melden als het de analyse waarschijnlijk verstoort.
   const meldingen = (uit.feedback || []).filter((r) => r.bron === "opname").map((r) => r.tekst);
   $("geluid").hidden = !meldingen.length;

@@ -1,21 +1,4 @@
 id	deel	zweeds	gezegd	goed_id	nederlands	wat_meten	opdracht
-A01	A accent	anden			de eend	accent 1 (and)	goed uitspreken
-A02	A accent	anden			de geest	accent 2 (ande)	goed uitspreken
-A03	A accent	tanken			de tank	accent 1 (tank)	goed uitspreken
-A04	A accent	tanken			de gedachte	accent 2 (tanke)	goed uitspreken
-B01	B lengte	glas			glas	lange a	goed uitspreken
-B02	B lengte	glass			ijs	korte a + lange s	goed uitspreken
-B03	B lengte	tak			dak	lange a	goed uitspreken
-B04	B lengte	tack			bedankt	korte a + lange k	goed uitspreken
-B05	B lengte	vit			wit	lange i	goed uitspreken
-B06	B lengte	vitt			wit (ett-vorm)	korte i + lange t	goed uitspreken
-B07	B klank	sju			zeven	sj-klank, u	goed uitspreken
-B08	B klank	tjugo			twintig	tj-klank	goed uitspreken
-B09	B klank	kök			keuken	zachte k (tj-klank)	goed uitspreken
-B10	B klank	skjorta			overhemd	sj-klank (skj)	goed uitspreken
-B11	B klank	hus			huis	Zweedse u	goed uitspreken
-B12	B klank	ny			nieuw	Zweedse y	goed uitspreken
-B13	B klank	sol			zon	lange o (oe-klank)	goed uitspreken
 C01	C zin	Jag heter Anna och jag bor i Malmö.			Ik heet Anna en ik woon in Malmö.	basiszin	goed uitspreken
 C02	C zin	Hon kommer från Nederländerna.			Ze komt uit Nederland.	lang woord, ä	goed uitspreken
 C03	C zin	Klockan sju äter vi frukost.			Om zeven uur ontbijten we.	V2 (inversie), sj	goed uitspreken
@@ -60,12 +43,22 @@ T05	T tekst	Sedan dricker de kaffe.			Daarna drinken ze koffie.	de (als dom), V2
 T06	T tekst	Olle simmar aldrig.			Olle zwemt nooit.	Olle (accent 2), aldrig	goed uitspreken
 T07	T tekst	Han tycker inte om att simma.			Hij houdt niet van zwemmen.	ontkenning, att	goed uitspreken
 T08	T tekst	Ingrid simmar tre gånger i veckan. Hon simmar alltid på morgonen, innan hon går till jobbet. Ibland simmar Fleur med henne. Fleur simmar inte så ofta, men hon tycker om det. Sedan dricker de kaffe. Olle simmar aldrig. Han tycker inte om att simma.			De hele tekst: Ingrid zwemt drie keer per week …	hele tekst voorlezen (vloeiendheid)	goed uitspreken
-D01	D fout	sju		B07	zeven	sj als Nederlandse sj, u als oe	FOUT: zeg ‘sjoe’ zoals in het Nederlands
-D02	D fout	tack		B04	bedankt	lange a	FOUT: zeg ‘taak’ (lange a)
-D03	D fout	glas		B01	glas	korte a	FOUT: zeg het kort, zoals Nederlands ‘glas’
-D04	D fout	hus		B11	huis	Nederlandse u	FOUT: zeg ‘hus’ met de Nederlandse u (als in ‘bus’)
-D05	D fout	kök		B09	keuken	harde k	FOUT: zeg ‘keuk’ met harde k aan het begin
-D06	D fout	tanken		A04	de gedachte	accent 1 i.p.v. 2	FOUT: zeg het met de melodie van A03 (de tank)
+L01	L tekst	Jag heter Olle. Jag bor i Västerås. Jag har ett hus och en hund. Hunden heter Sigge. Jag jobbar på en skola. Jag är lärare. Grannen heter Fleur. Hon kommer från Nederländerna. Hon talar svenska och lite engelska.			Svenska övningar H1: Grannen	voorlezen (A1–A2)	goed uitspreken
+L02	L tekst	På måndagar börjar skolan klockan åtta. Wilma vaknar klockan sju. Hon duschar och äter frukost. Sedan tar hon bussen till skolan. På eftermiddagen tränar hon. På kvällen läser hon. På fredagar slutar skolan klockan tolv. På lördagar vill Wilma sova länge.			Svenska övningar H2: Wilmas vecka	voorlezen (A1–A2)	goed uitspreken
+L03	L tekst	Olle har många hobbyer. Han spelar ofta gitarr. På lördagar fiskar han i sjön. Ibland fiskar han med Nils. Nils tycker om att fiska, men han får sällan någon fisk. Olle sjunger också i en kör. Han tycker inte om att dansa.			Svenska övningar H3: Olle och hans hobbyer	voorlezen (A1–A2)	goed uitspreken
+L04	L tekst	Förra veckan fyllde Olles mamma åttio år. Hela familjen besökte henne. Nils ritade ett kort och Wilma köpte en present. De åt tårta och drack kaffe i trädgården. Farmor skrattade mycket. Hon var glad hela dagen.			Svenska övningar H4: Farmor fyller år	voorlezen (A1–A2)	goed uitspreken
+L05	L tekst	Fleur har bott i Sverige i ett år. Hon har sett mycket. Hon har varit i Stockholm och i Göteborg. För fem år sedan såg hon norrsken i Kiruna. Bram har aldrig varit i Kiruna, och han har aldrig sett norrsken. Han vill gärna se det. Nästa vinter vill Fleur och Bram resa dit.			Svenska övningar H5: Har du sett norrsken?	voorlezen (A1–A2)	goed uitspreken
+L06	L tekst	Nils ska till simhallen. Han tar fyran från hållplatsen vid skolan. Bussen är försenad. Nils väntar i en kvart. Sedan kommer bussen och han stiger på. Han stiger av vid den tredje hållplatsen.			Svenska övningar H6: Nils tar fyran	voorlezen (A1–A2)	goed uitspreken
+L07	L tekst	Familjen Ek har en stuga vid en sjö. I juli var de där i två veckor. Det regnade mycket, men de hade ändå roligt. De spelade spel och läste böcker. En dag sken solen, så de badade och plockade blåbär. Nils gillar inte regn, och det gör inte Wilma heller.			Svenska övningar H7: Regn i stugan	voorlezen (A1–A2)	goed uitspreken
+L08	L tekst	Ingrid och Fleur är på ett kafé. Det finns kanelbullar och tårta. Ingrid tar en kanelbulle och en kopp kaffe. Fleur tycker att tårtan ser god ut, så hon tar den. Ingrid tror att den kostar mycket, men det gör den inte.			Svenska övningar H8: På kaféet	voorlezen (A1–A2)	goed uitspreken
+L09	L tekst	Bram hade glömt mobilen hemma. När han kom hem hade han tre missade samtal. Det var hans chef. I ett sms frågade hon om han kunde komma till ett möte nästa dag. Bram ringde tillbaka och sa att han kunde komma.			Svenska övningar H9: Tre missade samtal	voorlezen (A1–A2)	goed uitspreken
+L10	L tekst	Fleurs kollega Sara har flyttat till en ny lägenhet. Den har två rum och kök. Sara trivs, eftersom lägenheten är ljus och har en balkong. Hon har inte köpt någon soffa än, så hon sitter på golvet när hon tittar på tv.			Svenska övningar H10: Saras nya lägenhet	voorlezen (A1–A2)	goed uitspreken
+L11	L tekst	Olle har haft ont i ryggen i en vecka. Idag går han till vårdcentralen. Han sätter sig och väntar. Sedan undersöker läkaren honom. Hon säger att han ska vila sig och ta en tablett på kvällen. Olle tackar och går hem.			Svenska övningar H11: Hos läkaren	voorlezen (A1–A2)	goed uitspreken
+L12	L tekst	Familjen Ek ska köpa en gran. Wilma vill ha en stor gran, men Nils vill ha en liten. De köper en liten gran, eftersom vardagsrummet inte är så stort. De pyntar granen med röda kulor och vita ljus. Den lilla granen är vackrare än förra årets gran, tycker Ingrid.			Svenska övningar H12: Den lilla granen	voorlezen (A1–A2)	goed uitspreken
+L13	L tekst	Hej Petra! Tack för intervjun i måndags. Jag tyckte att det var ett bra samtal. Jag fick veta mycket om tjänsten och om företaget, som jag tycker är intressant. Ni frågade om jag kan börja i juni. Det kan jag gärna. Mina papper har redan skickats via er webbplats, men jag bifogar mitt cv en gång till. Jag ser fram emot att höra från er. Med vänliga hälsningar, Daan Visser			Svenska övningar H13: Ett tack efter intervjun	voorlezen (B1)	goed uitspreken
+L14	L tekst	Anouk läser en kurs i svenska på distans. Varje vecka skickas en ny uppgift ut, och den ska vara inlämnad på söndag. Uppgifterna rättas av läraren, och sedan får Anouk svar. Förra veckan visade läraren Anouks uppgift för hela gruppen. Hon blev glad och stolt. Kursen är på halvfart, så Anouk kan jobba också. Efter kursen vill hon söka till en utbildning på högskolan.			Svenska övningar H14: Kursen på distans	voorlezen (B1)	goed uitspreken
+L15	L tekst	När Femke kom hem i går var det kallt i lägenheten. Elementet i sovrummet hade gått sönder. Hon ringde hyresvärden och gjorde en felanmälan. Nästa morgon kom en reparatör. Han stängde av vattnet, bytte en del och satte på värmen igen. Efter en timme var det varmt i rummet. Femke tackade och bjöd honom på kaffe. Femke var glad att det gick så snabbt.			Svenska övningar H15: Elementet	voorlezen (B1)	goed uitspreken
+L16	L tekst	Joris flyttade till Sverige i maj. Först måste han folkbokföra sig hos Skatteverket. Han fyllde i en blankett och visade sitt pass. Handläggaren sa att beslutet skulle komma med posten inom några veckor. Joris hoppades att det skulle gå snabbt, och han hade tur: efter tre veckor fick han sitt personnummer. Nu kan han öppna ett bankkonto. Han ringde direkt till banken och bokade en tid.			Svenska övningar H16: Personnumret	voorlezen (B1)	goed uitspreken
 D07	D fout	Jag förstår inte.	Jag förstår.	C04	Ik begrijp het niet.	woord weggelaten	FOUT: zeg alleen ‘Jag förstår.’
 D08	D fout	Klockan sju äter vi frukost.	Klockan sju vi äter frukost.	C03	Om zeven uur ontbijten we.	V2-fout	FOUT: zeg ‘Klockan sju vi äter frukost.’
 D09	D fout	Det finns tjugosju stjärnor på himlen.		C11	Er staan zevenentwintig sterren aan de hemel.	stj letterlijk	FOUT: zeg ‘stjärnor’ met s-t-j los uitgesproken

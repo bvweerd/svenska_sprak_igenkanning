@@ -13,7 +13,7 @@ VERWACHT_KEUZE = {"A01": "accent1", "A02": "accent2", "A03": "accent1", "A04": "
 LENGTEPAREN = [("B01", "B02", "glas – glass"), ("B03", "B04", "tak – tack"),
                ("B05", "B06", "vit – vitt"), ("B01", "D03", "glas goed – glas kort (fout)"),
                ("B04", "D02", "tack goed – tack lang (fout)")]
-ZINDELEN = ("C", "F", "G", "T")   # hele zinnen: C (proef), F (A1), G (A2), T (tekst)
+ZINDELEN = ("C", "F", "G", "T", "L")   # C (proef), F (A1), G (A2), T (tekst), L (oefenteksten)
 MELODIE = ["A01", "A02", "A03", "A04", "D06", "C09"]
 
 
