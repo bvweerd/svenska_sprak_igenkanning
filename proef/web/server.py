@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urlparse
 
 from proef_common import (klank_oordeel, lees_klank_varianten, KLANK_MODELLEN, OPNAMES, SCORE_KLANKEN, WERK, bewerkingen, doel_variant, lees_ijking,
                           normaliseer, ruwe_score, score_onderdelen, vergelijk, zet_om, zinnen)
-from coach import ARCHIEF, eindoordeel, geschiedenis, kies_tips, oude_analyse, patronen, voorbeeld_wav, woordtijden
+from coach import ARCHIEF, eigen_wav, eindoordeel, niets_gehoord, geschiedenis, kies_tips, oude_analyse, patronen, voorbeeld_wav, woordtijden
 
 API = {
     "whisper": os.environ.get("WHISPER_API", "http://whisper-api:8001"),
@@ -165,6 +165,61 @@ def feedback(zin_id, r, res):
     return oordeel, [{"soort": s, "bron": b, "tekst": t} for s, b, t in regels]
 
 
+def analyseer(zin_id, rij, wav, geluid, microfoon, archiefnaam):
+    """Analyseert een (schoongemaakte, 16 kHz) opname met de drie API's en bewaart de uitkomst als
+    werk/web/archief/<archiefnaam>.json. Voor nieuwe opnames en om een mislukte analyse over te doen."""
+    t0 = time.perf_counter()
+    with ThreadPoolExecutor(3) as pool:
+        taken = {naam: pool.submit(vraag, naam, wav, zin_id) for naam in API}
+        res = {naam: t.result() for naam, t in taken.items()}
+    oordeel, regels = feedback(zin_id, rij, res)
+    # Score: dezelfde berekening als de batch, vergeleken met de laatste ijking (werk/score_ijking.json).
+    wh, kl, mfa = res.get("whisper", {}), res.get("klanken", {}), res.get("mfa", {})
+    ijking = lees_ijking()
+    modellen = KLANK_MODELLEN
+    onderdelen = score_onderdelen(wh if "fout" not in wh else None,
+                                  {m: kl.get(m) for m in modellen if isinstance(kl.get(m), dict)},
+                                  mfa.get("keuze"), zin_id, native_per=(ijking or {}).get("native_per"))
+    score = {**vergelijk(ruwe_score(onderdelen), ijking),
+             "onderdelen": {n: round(100 * v) for n, v in onderdelen.items()}}
+    # Opnamekwaliteit: blijft er na het schoonmaken veel brom over, of is het erg zacht, dan zeggen we dat.
+    if geluid["veel_brom"]:
+        regels.insert(0, {"soort": "fout", "bron": "opname",
+                          "tekst": f"Veel laag bromgeluid in de opname ({geluid['brom_db']} dB, je stem "
+                                   f"{geluid['spraak_db']} dB): dat maakt de analyse onbetrouwbaar. Houd de "
+                                   "microfoon iets opzij van je mond (niet ervoor) en zet ventilatoren uit."})
+    if geluid["zacht"]:
+        regels.insert(0, {"soort": "fout", "bron": "opname",
+                          "tekst": "De opname is erg zacht: spreek wat luider of zet de microfoon harder."})
+    try:
+        woorden = woord_oordeel(zin_id, rij, res)
+    except Exception as e:  # noqa: BLE001 — per woord is extra; de rest van de uitslag gaat voor
+        print("woord_oordeel mislukt:", repr(e), flush=True)
+        woorden = []
+    # Gebruikersvriendelijke laag (coach.py): één oordeel in woorden, hoogstens twee tips, woordtijden om
+    # te luisteren en vergelijken, en terugkerende patronen over je opnames.
+    try:
+        pat = patronen()
+        tips = kies_tips(zin_id, rij, res, TOELICHTING, pat)
+        tijden = woordtijden(zin_id, rij, res)
+        if len(tijden) == len(woorden):
+            woorden = [dict(w, **t) for w, t in zip(woorden, tijden)]
+    except Exception as e:  # noqa: BLE001 — de coachlaag is extra; de rest van de uitslag gaat voor
+        print("coach mislukt:", repr(e), flush=True)
+        pat, tips = [], []
+    if niets_gehoord(wh, geluid):
+        tips = []   # bij een stille opname zijn tips onzin
+    kop, zin, soort = eindoordeel(score, wh if "fout" not in wh else None, tips, geluid)
+    uit = {"id": zin_id, "oordeel": oordeel, "eindoordeel": {"kop": kop, "zin": zin, "soort": soort},
+           "tips": tips, "patronen": pat, "score": score, "woorden": woorden, "feedback": regels,
+           "audio": {"eigen": f"/api/audio/{wav.name}",
+                     "voorbeeld": f"/api/voorbeeld/{zin_id}" if voorbeeld_wav(zin_id) else None},
+           "geluid": geluid, "microfoon": microfoon, "resultaten": res,
+           "sec": round(time.perf_counter() - t0, 1)}
+    (ARCHIEF / f"{archiefnaam}.json").write_text(json.dumps(uit, ensure_ascii=False, indent=1), encoding="utf-8")
+    return uit
+
+
 class Handler(BaseHTTPRequestHandler):
     def _stuur(self, code, body, soort="application/json; charset=utf-8"):
         if not isinstance(body, bytes):
@@ -187,12 +242,21 @@ class Handler(BaseHTTPRequestHandler):
         elif pad == "/api/patronen":
             self._stuur(200, patronen())
         elif m := re.fullmatch(r"/api/geschiedenis/([A-Z]\d\d)", pad):
-            self._stuur(200, geschiedenis(m.group(1)))
+            self._stuur(200, geschiedenis(m.group(1), zinnen().get(m.group(1)), TOELICHTING))
         elif m := re.fullmatch(r"/api/analyse/([A-Z]\d\d-\d{8}-\d{6})", pad):
             # Een eerdere opname terugkijken: de bewaarde analyse, aangevuld met de nieuwere feedbacklaag.
-            if not (ARCHIEF / f"{m.group(1)}.json").exists():
+            naam = m.group(1)
+            if not (ARCHIEF / f"{naam}.json").exists():
                 return self._stuur(404, {"fout": "geen analyse"})
-            self._stuur(200, oude_analyse(m.group(1), zinnen().get(m.group(1)[:3]), TOELICHTING))
+            rij = zinnen().get(naam[:3])
+            oud = json.loads((ARCHIEF / f"{naam}.json").read_text(encoding="utf-8"))
+            wav = eigen_wav(naam)
+            # Mislukt (bv. opgenomen terwijl de analyses nog niet klaar waren): nu opnieuw analyseren.
+            opnieuw = (oud.get("score") or {}).get("ruw") is None and rij is not None and wav is not None
+            if opnieuw:
+                analyseer(naam[:3], rij, wav, oud.get("geluid") or {"veel_brom": False, "zacht": False},
+                          oud.get("microfoon") or {}, naam)
+            self._stuur(200, dict(oude_analyse(naam, rij, TOELICHTING), opnieuw_geanalyseerd=opnieuw))
         elif m := re.fullmatch(r"/api/audio/([A-Z]\d\d-\d{8}-\d{6}(?:-16k)?\.wav)", pad):
             # Je eigen opname (schoongemaakt, 16 kHz): de woordtijden van MFA horen bij dit bestand.
             f = ARCHIEF / m.group(1)
@@ -243,54 +307,7 @@ class Handler(BaseHTTPRequestHandler):
         wav = archief / f"{zin_id}-{stempel}-16k.wav"  # eigen naam: de upload kan zelf een .wav zijn
         geluid = zet_om(bron, wav)   # 16 kHz mono; plof bij het aanzetten en brom onder 80 Hz eruit
 
-        t0 = time.perf_counter()
-        with ThreadPoolExecutor(3) as pool:
-            taken = {naam: pool.submit(vraag, naam, wav, zin_id) for naam in API}
-            res = {naam: t.result() for naam, t in taken.items()}
-        oordeel, regels = feedback(zin_id, rijen[zin_id], res)
-        # Score: dezelfde berekening als de batch, vergeleken met de laatste ijking (werk/score_ijking.json).
-        wh, kl, mfa = res.get("whisper", {}), res.get("klanken", {}), res.get("mfa", {})
-        ijking = lees_ijking()
-        modellen = KLANK_MODELLEN
-        onderdelen = score_onderdelen(wh if "fout" not in wh else None,
-                                      {m: kl.get(m) for m in modellen if isinstance(kl.get(m), dict)},
-                                      mfa.get("keuze"), zin_id, native_per=(ijking or {}).get("native_per"))
-        score = {**vergelijk(ruwe_score(onderdelen), ijking),
-                 "onderdelen": {n: round(100 * v) for n, v in onderdelen.items()}}
-        # Opnamekwaliteit: blijft er na het schoonmaken veel brom over, of is het erg zacht, dan zeggen we dat.
-        if geluid["veel_brom"]:
-            regels.insert(0, {"soort": "fout", "bron": "opname",
-                              "tekst": f"Veel laag bromgeluid in de opname ({geluid['brom_db']} dB, je stem "
-                                       f"{geluid['spraak_db']} dB): dat maakt de analyse onbetrouwbaar. Houd de "
-                                       "microfoon iets opzij van je mond (niet ervoor) en zet ventilatoren uit."})
-        if geluid["zacht"]:
-            regels.insert(0, {"soort": "fout", "bron": "opname",
-                              "tekst": "De opname is erg zacht: spreek wat luider of zet de microfoon harder."})
-        try:
-            woorden = woord_oordeel(zin_id, rijen[zin_id], res)
-        except Exception as e:  # noqa: BLE001 — per woord is extra; de rest van de uitslag gaat voor
-            print("woord_oordeel mislukt:", repr(e), flush=True)
-            woorden = []
-        # Gebruikersvriendelijke laag (coach.py): één oordeel in woorden, hoogstens twee tips, woordtijden om
-        # te luisteren en vergelijken, en terugkerende patronen over je opnames.
-        try:
-            pat = patronen()
-            tips = kies_tips(zin_id, rijen[zin_id], res, TOELICHTING, pat)
-            tijden = woordtijden(zin_id, rijen[zin_id], res)
-            if len(tijden) == len(woorden):
-                woorden = [dict(w, **t) for w, t in zip(woorden, tijden)]
-        except Exception as e:  # noqa: BLE001 — de coachlaag is extra; de rest van de uitslag gaat voor
-            print("coach mislukt:", repr(e), flush=True)
-            pat, tips = [], []
-        kop, zin, soort = eindoordeel(score, wh if "fout" not in wh else None, tips)
-        uit = {"id": zin_id, "oordeel": oordeel, "eindoordeel": {"kop": kop, "zin": zin, "soort": soort},
-               "tips": tips, "patronen": pat, "score": score, "woorden": woorden, "feedback": regels,
-               "audio": {"eigen": f"/api/audio/{wav.name}",
-                         "voorbeeld": f"/api/voorbeeld/{zin_id}" if voorbeeld_wav(zin_id) else None},
-               "geluid": geluid, "microfoon": microfoon, "resultaten": res,
-               "sec": round(time.perf_counter() - t0, 1)}
-        (archief / f"{zin_id}-{stempel}.json").write_text(json.dumps(uit, ensure_ascii=False, indent=1),
-                                                          encoding="utf-8")
+        uit = analyseer(zin_id, rijen[zin_id], wav, geluid, microfoon, f"{zin_id}-{stempel}")
         self._stuur(200, uit)
 
     def log_message(self, fmt, *args):

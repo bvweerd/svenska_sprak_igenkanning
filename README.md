@@ -50,8 +50,18 @@ alleen langs de zinnen te gaan die je nog niet hebt ingesproken. Je krijgt (`pro
 - **Waar je aan kunt werken**: de klankfouten die over je laatste opname per zin het vaakst terugkomen (min.
   3 keer), want één klanktip zegt weinig en tien keer dezelfde fout wel.
 - **Eerdere opnames** onder elke zin (datum, oordeel, score; „?” = gemaakt vóór de microfoonkeuze, „test” =
-  testbestand). Klik erop om die analyse terug te kijken, met tips en luisteren per woord. De score van oude
-  opnames wordt op de huidige schaal herberekend, zodat oud en nieuw vergelijkbaar zijn.
+  testbestand). Klik erop om die analyse terug te kijken, met tips en luisteren per woord. Score, oordeel en
+  tips van oude opnames worden met de huidige schaal en regels herberekend, zodat oud en nieuw vergelijkbaar
+  zijn. Een analyse die destijds mislukte (bv. opgenomen terwijl de analyses opnieuw opstartten), wordt bij
+  het openen alsnog gedaan. Een (bijna) stille opname krijgt „Niets gehoord” in plaats van een oordeel.
+- Whisper-tips slaan namen over (Wilma → „Vilma” is spelling, geen uitspraak; een naam is elk woord dat
+  ergens in de zinnen midden in een zin met een hoofdletter staat) en tellen cijfers als het getalwoord
+  (8 = *åtta*).
+- **Kruiscontrole**: Whisper is een taalmodel en raadt bij twijfel een waarschijnlijker woord (*sjön* →
+  „kön”), ook als de klanken klopten. Een Whisper-tip gaat daarom alleen door als geen van beide
+  klankherkenners het woord goed vond, en een klanktip vervalt als de espeak-herkenner de verwachte klank wél
+  hoorde. Korte functiewoorden (*och*, *det*, *jag*, *är* …) krijgen geen klanktip: die worden in gewone spraak
+  verkort. Gevolg: minder onterechte tips, maar ook een gemiste (de bewust harde sk in D10 krijgt geen tip).
 - Onder **Meer details** (ingeklapt) de rest:
 - **Score**: waar je zit op de schaal Nederlands accent (0) → moedertaalspreker (100), met een niveau (zie hieronder).
 - **Per woord**: de zin met elk woord groen (goed), oranje (let op) of rood (fout), en daaronder wat er

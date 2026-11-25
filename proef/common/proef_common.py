@@ -49,7 +49,9 @@ def opnames():
 
 
 # Schrijfwijzen die hetzelfde zijn (Whisper schrijft getallen soms in cijfers).
-GELIJKE_VORMEN = {"idag": "i dag", "7": "sju", "20": "tjugo", "27": "tjugosju"}
+GELIJKE_VORMEN = {"idag": "i dag", "2": "två", "3": "tre", "4": "fyra", "5": "fem", "6": "sex", "7": "sju",
+                  "8": "åtta", "9": "nio", "10": "tio", "11": "elva", "12": "tolv", "20": "tjugo", "27": "tjugosju",
+                  "80": "åttio"}
 
 
 # ---------- audio omzetten en schoonmaken (ffmpeg; gebruikt door prep en de webpagina) ----------
@@ -427,7 +429,7 @@ def klank_oordeel(w, var=None):
 # vervalt de cache vanzelf. Opnames die er niet meer zijn, vallen er bij het bewaren uit.
 
 CACHE_MAP = WERK / "cache"
-ANALYSE_VERSIE = "1"   # ophogen als gedeelde analyse-logica verandert die niet in het script van de stap staat
+ANALYSE_VERSIE = "2"   # ophogen als gedeelde analyse-logica verandert die niet in het script van de stap staat
 
 
 def inhoud_hash(*delen):

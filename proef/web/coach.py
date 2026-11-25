@@ -72,23 +72,46 @@ def _normaal(f, var):
     return f["gehoord"] in var.get("extra", [])
 
 
-def klank_tips(w, var):
-    """Tipcategorieën voor één woord (per_woord-item), alleen als het woord een melding krijgt."""
-    if klank_oordeel(w, var)[0] == "goed":
+# Korte functiewoorden worden in gewone spraak bijna altijd verkort uitgesproken (och → „ok”, det → „de”,
+# jag → „ja”); het woordenboek geeft de volle vorm. Daarop geen klanktips.
+KORTE_WOORDEN = {"och", "det", "de", "dem", "jag", "mig", "dig", "sig", "med", "ska", "en", "ett", "att", "är"}
+
+
+def _gehoord_door_ander(f, w_ander):
+    """Hoorde de andere klankherkenner (espeak) in hetzelfde woord wél wat verwacht werd? Dan is de afwijking
+    van het Zweedse model twijfelachtig (bv. sjön: Zweeds model [ɛ r n], espeak [ɧ ø n])."""
+    if not w_ander:
+        return False
+    gehoord = w_ander["herkend"].split()
+    if f["soort"] == "extra":
+        return f["gehoord"] not in gehoord          # de extra klank hoorde espeak niet
+    return f["verwacht"] in gehoord
+
+
+def klank_tips(w, var, w_ander=None):
+    """Tipcategorieën voor één woord (per_woord-item van het Zweedse model), alleen als het woord een melding
+    krijgt. w_ander: hetzelfde woord volgens de espeak-klankherkenner, ter controle."""
+    if w["woord"] in KORTE_WOORDEN or klank_oordeel(w, var)[0] == "goed":
         return []
-    uit = []
+    uit, echt = [], False
     for f in w["fouten"]:
-        if _normaal(f, var):
+        if _normaal(f, var) or _gehoord_door_ander(f, w_ander):
             continue
+        echt = True
         for i, _, _, test in FOUTEN:
             if test(f, w) and i not in uit:
                 uit.append(i)
-    if not uit:
+    if not uit and echt:                 # alleen als er na de controle nog iets overblijft
         uit.append("klank")
     return uit
 
 
-def eindoordeel(score, wh, tips=()):
+def niets_gehoord(wh, geluid):
+    """Een (bijna) stille of afgebroken opname: Whisper hoorde geen woord en de opname is erg zacht."""
+    return bool((geluid or {}).get("zacht")) and not normaliseer((wh or {}).get("herkend", "")).split()
+
+
+def eindoordeel(score, wh, tips=(), geluid=None):
     """Eén oordeel in woorden: (kop, zin, soort).
     De score middelt over de hele zin: één verkeerde klank in een zin van 25 klanken verschuift hem nauwelijks
     (gemeten: een bewust harde sk in D10 kreeg 97). Daarom geen 'Uitstekend' zolang er een betrouwbare tip is
@@ -97,6 +120,9 @@ def eindoordeel(score, wh, tips=()):
     wer = (wh or {}).get("wer_verwacht")
     verstaan = wer is not None and float(wer) <= 0.1
     betrouwbare_tip = any(t.get("bron") in ("verstaan", "uitspraak") for t in tips)
+    if niets_gehoord(wh, geluid):
+        return ("Niets gehoord", "De opname is (bijna) stil of heel kort. Kies bij Microfoon je headset, druk op "
+                                 "Opnemen, spreek de hele zin en druk dan pas op Stop.", "onbekend")
     if not niveau:
         return ("Geen oordeel", "De analyse is niet gelukt; probeer het nog eens.", "onbekend")
     if niveau == "als een moedertaalspreker" and betrouwbare_tip:
@@ -110,6 +136,38 @@ def eindoordeel(score, wh, tips=()):
                 "redelijk")
     return ("Oefen deze zin nog eens", "Een Zweed zou je hier lastig verstaan. Luister naar het voorbeeld en "
                                        "probeer het rustig opnieuw.", "zwak")
+
+
+def _namen_in(tekst):
+    uit, begin = set(), True
+    for w in tekst.split():
+        if w[:1].isupper() and not begin:
+            uit.update(normaliseer(w).split())
+        begin = w[-1:] in ".!?"
+    return uit
+
+
+def namen(r):
+    """Namen: woorden die ergens in de zinnen midden in een zin met een hoofdletter staan (Wilma, Fleur, Olle,
+    Västerås); zo telt Olle ook aan het begin van een zin als naam. Whisper kent zulke namen slecht en schrijft
+    er iets anders van (Vilma, flue, Alla); dat is geen uitspraakfout."""
+    from proef_common import zinnen
+    alle = set()
+    for rij in zinnen().values():
+        alle |= _namen_in(rij["zweeds"])
+    return alle | _namen_in(r["zweeds"])
+
+
+def _bevestigd(k, res, var_alle):
+    """Bevestigt een klankherkenner dat er met woord k iets mis is? Whisper is een taalmodel en raadt bij twijfel
+    een ander, waarschijnlijker woord (sjön → „kön”) — ook als de klanken klopten. Een Whisper-tip gaat alleen
+    door als geen van beide klankherkenners het woord goed vond. Zonder klankanalyse: niet tegenhouden."""
+    oordelen = []
+    for m in ("xlsr300m-sv", "xlsr53-espeak"):
+        pw = res.get("klanken", {}).get(m, {}).get("per_woord") or []
+        if k < len(pw):
+            oordelen.append(klank_oordeel(pw[k], var_alle.get(m))[0])
+    return not oordelen or all(o != "goed" for o in oordelen)
 
 
 def _weergave(r):
@@ -173,9 +231,14 @@ def kies_tips(zin_id, r, res, toelichting, patronen=(), max_tips=2):
     wh = res.get("whisper", {})
     if "herkend" in wh:
         _, ops = bewerkingen(verwacht, normaliseer(wh["herkend"]).split())
+        eigennamen, var_alle = namen(r), lees_klank_varianten()
         i = 0
         for soort, a, b in ops:
-            if soort == "S":
+            if a in eigennamen:          # andere spelling van een naam: geen tip
+                pass
+            elif soort in ("S", "D") and not _bevestigd(i, res, var_alle):
+                pass                     # de klanken waren in orde: Whisper raadde een ander woord
+            elif soort == "S":
                 tips.append({"titel": f"„{a}” werd „{b}” verstaan",
                              "uitleg": f"Een Zweed hoort hier „{b}” in plaats van „{a}”. Luister naar het voorbeeld "
                                        "en zeg het woord nog eens.", "woord": naar[i] if i < len(naar) else None,
@@ -198,10 +261,11 @@ def kies_tips(zin_id, r, res, toelichting, patronen=(), max_tips=2):
     # 3. Klanktips: de categorie die in deze opname het vaakst voorkomt; terugkerende patronen gaan voor.
     var = lees_klank_varianten().get(SCORE_KLANKEN)
     pw = res.get("klanken", {}).get(SCORE_KLANKEN, {}).get("per_woord") or []
+    pw_es = res.get("klanken", {}).get("xlsr53-espeak", {}).get("per_woord") or []
     if len(pw) == len(verwacht):
         per_cat = defaultdict(list)
         for k, w in enumerate(pw):
-            for cat in klank_tips(w, var):
+            for cat in klank_tips(w, var, pw_es[k] if len(pw_es) == len(pw) else None):
                 per_cat[cat].append(k)
         terugkerend = {p["id"] for p in patronen}
         volgorde = sorted(per_cat, key=lambda c: (c == "klank", c not in terugkerend, -len(per_cat[c])))
@@ -209,7 +273,8 @@ def kies_tips(zin_id, r, res, toelichting, patronen=(), max_tips=2):
             k = per_cat[cat][0]
             if cat == "klank":
                 w = pw[k]
-                f = next((f for f in w["fouten"] if not _normaal(f, var)), None)
+                w_es = pw_es[k] if len(pw_es) == len(pw) else None
+                f = next((f for f in w["fouten"] if not _normaal(f, var) and not _gehoord_door_ander(f, w_es)), None)
                 uitleg = (f"{klank(f['verwacht'])} klonk als {klank(f['gehoord'])}." if f and f["soort"] == "anders"
                           else "Een klank in dit woord klonk anders.") + " Luister naar het voorbeeld en vergelijk."
                 tips.append({"titel": f"Klank in „{w['woord']}”", "uitleg": uitleg, "woord": naar[k], "bron": "klanken"})
@@ -242,11 +307,13 @@ def patronen(min_aantal=3, max_aantal=3):
     tel, voorbeelden = Counter(), defaultdict(list)
     for p in laatste.values():
         try:
-            pw = json.loads(p.read_text(encoding="utf-8"))["resultaten"]["klanken"][SCORE_KLANKEN]["per_woord"]
+            kl = json.loads(p.read_text(encoding="utf-8"))["resultaten"]["klanken"]
+            pw = kl[SCORE_KLANKEN]["per_woord"]
+            pw_es = (kl.get("xlsr53-espeak") or {}).get("per_woord") or []
         except (KeyError, TypeError, ValueError):
             continue
-        for w in pw:
-            for cat in klank_tips(w, var):
+        for k, w in enumerate(pw):
+            for cat in klank_tips(w, var, pw_es[k] if len(pw_es) == len(pw) else None):
                 if cat != "klank":
                     tel[cat] += 1
                     if w["woord"] not in voorbeelden[cat]:
@@ -283,9 +350,10 @@ def huidige_score(zin_id, res):
     return {**vergelijk(ruwe_score(ond), ijking), "onderdelen": {n: round(100 * v) for n, v in ond.items()}}
 
 
-def geschiedenis(zin_id):
-    """Alle eerdere analyses van een zin, nieuwste eerst: naam, tijd, oordeel, schaal, microfoon."""
-    uit = []
+def geschiedenis(zin_id, rij=None, toelichting=None):
+    """Alle eerdere analyses van een zin, nieuwste eerst: naam, tijd, oordeel, schaal, microfoon. Oordeel en
+    score met de huidige regels, net als bij terugkijken (oude_analyse)."""
+    uit, pat = [], patronen() if rij is not None else []
     for p in sorted(ARCHIEF.glob(f"{zin_id}-*.json"), reverse=True):
         m = re.fullmatch(r"([A-Z]\d\d)-(\d{8}-\d{6})\.json", p.name)
         if not m:
@@ -296,7 +364,9 @@ def geschiedenis(zin_id):
             continue
         res = d.get("resultaten", {})
         score = huidige_score(zin_id, res)
-        kop = eindoordeel(score, res.get("whisper"), d.get("tips") or [])[0]
+        tips = ([] if rij is None or niets_gehoord(res.get("whisper"), d.get("geluid"))
+                else kies_tips(zin_id, rij, res, toelichting or {}, pat))
+        kop = eindoordeel(score, res.get("whisper"), tips, d.get("geluid"))[0]
         # Geen browseropname (geen .webm, wel een geüploade .wav): een testbestand, bv. de computerstem.
         test = not (ARCHIEF / f"{p.stem}.webm").exists() and (ARCHIEF / f"{p.stem}.wav").exists()
         uit.append({"naam": p.stem, "tijd": _tijd(m.group(2)), "kop": kop, "schaal": score.get("gelijkenis"),
@@ -311,15 +381,16 @@ def oude_analyse(naam, rij, toelichting):
     zin_id, res = naam.split("-")[0], d.get("resultaten", {})
     d["tijd"] = _tijd(naam.split("-", 1)[1])
     if rij is not None:
-        if "tips" not in d:
-            d["tips"] = kies_tips(zin_id, rij, res, toelichting, patronen())
+        # Tips altijd opnieuw met de huidige regels (de bewaarde kunnen van een oudere versie zijn).
+        d["tips"] = ([] if niets_gehoord(res.get("whisper"), d.get("geluid"))
+                     else kies_tips(zin_id, rij, res, toelichting, patronen()))
         woorden = d.get("woorden") or []
         if woorden and "eigen" not in woorden[0]:
             tijden = woordtijden(zin_id, rij, res)
             if len(tijden) == len(woorden):
                 d["woorden"] = [dict(w, **t) for w, t in zip(woorden, tijden)]
     d["score"] = huidige_score(zin_id, res)
-    kop, zin, soort = eindoordeel(d["score"], res.get("whisper"), d.get("tips", []))
+    kop, zin, soort = eindoordeel(d["score"], res.get("whisper"), d.get("tips", []), d.get("geluid"))
     d["eindoordeel"] = {"kop": kop, "zin": zin, "soort": soort}
     wav = eigen_wav(naam)
     d["audio"] = {"eigen": f"/api/audio/{wav.name}" if wav else None,

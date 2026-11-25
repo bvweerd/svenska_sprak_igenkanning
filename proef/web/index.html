@@ -510,14 +510,16 @@ async function laadHistorie(zinId, gekozen) {
 }
 
 async function bekijk(naam) {
-  $("status").textContent = "Analyse ophalen…";
+  $("status").textContent = "Analyse ophalen… (is die destijds mislukt, dan wordt hij nu opnieuw gedaan; even geduld)";
   try {
     const d = await (await fetch("/api/analyse/" + naam)).json();
     if (d.fout) throw new Error(d.fout);
     toonUitslag(d);
     $("uitslag-tijd").textContent = `Eerdere opname van ${d.tijd}` +
-      (d.microfoon && d.microfoon.naam ? ` · ${d.microfoon.naam}` : " · microfoon onbekend");
+      (d.microfoon && d.microfoon.naam ? ` · ${d.microfoon.naam}` : " · microfoon onbekend") +
+      (d.opnieuw_geanalyseerd ? " · nu opnieuw geanalyseerd" : "");
     $("status").textContent = "";
+    if (d.opnieuw_geanalyseerd) await laadHistorie(zinnen[plek].id, naam);
     [...$("historielijst").children].forEach((b) => b.classList.toggle("gekozen", b.onclick && b.textContent.startsWith(d.tijd)));
   } catch (e) { $("status").textContent = "Kon de analyse niet ophalen: " + e.message; }
 }
