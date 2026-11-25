@@ -15,12 +15,13 @@ import subprocess
 import sys
 import time
 import unicodedata
+from pathlib import Path
 
 import soundfile as sf
 import torch
 from transformers import AutoProcessor, Wav2Vec2ForCTC
 
-from proef_common import (KLANK_PER_WOORD, KLANK_VARIANTEN, RESULTATEN, bewerkingen, leer_varianten, foutpercentage, normaliseer, opnames, ops_tekst,
+from proef_common import (Cache, inhoud_hash, KLANK_PER_WOORD, KLANK_VARIANTEN, RESULTATEN, bewerkingen, leer_varianten, foutpercentage, normaliseer, opnames, ops_tekst,
                           schrijf_csv, serveer, zin_voor, zinnen)
 
 MODELLEN = {
@@ -168,11 +169,21 @@ def main():
     wb = lees_woordenboek()
     rijen_tsv = zinnen()
     uit = []
-    for naam, (model, processor) in laad_alle().items():
+    cache = Cache("klanken", __file__)   # alleen nieuwe of gewijzigde opnames opnieuw analyseren
+    wb_hash = inhoud_hash(Path(WOORDENBOEK))
+    for naam, pad in MODELLEN.items():
+        geladen = None                    # model pas laden als er iets te doen is
         for spreker, zin_id, wav in opnames():
-            rij = analyseer(naam, model, processor, wb, spreker, zin_id, wav, zin_voor(spreker, zin_id, rijen_tsv))
-            uit.append(rij)
-            print(f"{naam:14} {spreker:6} {zin_id}  {rij['herkend']}   [{rij['verschillen']}]", flush=True)
+            r = zin_voor(spreker, zin_id, rijen_tsv)
+            sleutel = inhoud_hash(wav, r["zweeds"], naam, wb_hash)
+            rij = cache.get(sleutel)
+            if rij is None:
+                geladen = geladen or (Wav2Vec2ForCTC.from_pretrained(pad).eval(), AutoProcessor.from_pretrained(pad))
+                rij = analyseer(naam, *geladen, wb, spreker, zin_id, wav, r)
+                cache.put(sleutel, rij)
+                print(f"{naam:14} {spreker:6} {zin_id}  {rij['herkend']}   [{rij['verschillen']}]", flush=True)
+            uit.append(dict(rij, spreker=spreker, id=zin_id))
+    cache.bewaar()
     # Per woord bewaren (voor controle achteraf) en uit de moedertaalsprekers leren welke afwijkingen van de
     # woordenboek-uitspraak normaal zijn; de webpagina en het verslag gebruiken die bij het oordeel per woord.
     import json

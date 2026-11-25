@@ -22,5 +22,5 @@ RUN cat /tmp/extra_uitspraak.dict >> /mfa/pretrained_models/dictionary/swedish_m
     && mfa model inspect acoustic swedish_mfa > /dev/null && mfa server init
 WORKDIR /app
 # api.py (webpagina) gebruikt dezelfde analyse als de batchstap 'prosodie'.
-COPY --chown=mfa:mfa mfa/align.sh mfa/varianten.tsv mfa/api.py common/proef_common.py prosodie/analyse.py ./
+COPY --chown=mfa:mfa mfa/align.sh mfa/incrementeel.py mfa/varianten.tsv mfa/api.py common/proef_common.py prosodie/analyse.py ./
 CMD ["bash", "align.sh"]

@@ -15,7 +15,7 @@ import wave
 import numpy as np
 from faster_whisper import WhisperModel
 
-from proef_common import RESULTATEN, foutpercentage, normaliseer, opnames, schrijf_csv, serveer, zin_voor, zinnen
+from proef_common import RESULTATEN, Cache, inhoud_hash, foutpercentage, normaliseer, opnames, schrijf_csv, serveer, zin_voor, zinnen
 
 MODELLEN = os.environ.get("WHISPER_MODELLEN", "tiny base small").split()
 MAP = os.environ.get("WHISPER_MAP", "/modellen")
@@ -63,13 +63,21 @@ def analyseer(model, maat, spreker, zin_id, wav, r):
 
 def main():
     rijen_tsv = zinnen()
+    cache = Cache("whisper", __file__)   # alleen nieuwe of gewijzigde opnames opnieuw transcriberen
     uit = []
     for maat in MODELLEN:
-        model = laad(maat)
+        model = None                      # pas laden als er iets te doen is
         for spreker, zin_id, wav in opnames():
-            rij = analyseer(model, maat, spreker, zin_id, wav, zin_voor(spreker, zin_id, rijen_tsv))
-            uit.append(rij)
-            print(f"{maat:6} {spreker:6} {zin_id}  {rij['herkend']}", flush=True)
+            r = zin_voor(spreker, zin_id, rijen_tsv)
+            sleutel = inhoud_hash(wav, r["zweeds"], r["gezegd"], maat)
+            rij = cache.get(sleutel)
+            if rij is None:
+                model = model or laad(maat)
+                rij = analyseer(model, maat, spreker, zin_id, wav, r)
+                cache.put(sleutel, rij)
+                print(f"{maat:6} {spreker:6} {zin_id}  {rij['herkend']}", flush=True)
+            uit.append(dict(rij, spreker=spreker, id=zin_id))
+    cache.bewaar()
     schrijf_csv(RESULTATEN / "whisper.csv", uit, list(uit[0]) if uit else ["model"])
 
 

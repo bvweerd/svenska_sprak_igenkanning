@@ -114,10 +114,20 @@ een extra download en veel taalafhankelijke code). De opnames staan nog in `werk
 
 ### Snelheid
 
-Alles draait op de CPU. Wat de batch sneller maakt: Whisper alleen in maat `small` (die gebruikt de score; zet
-`WHISPER_MODELLEN` in `docker-compose.yml` op `"tiny base small"` om maten te vergelijken), Piper en het
-accent-anker alleen voor nieuwe of gewijzigde zinnen (`_teksten.json` in `werk/piper_ruw` en `werk/anker_ruw`),
-en FLEURS maar één keer ophalen.
+Alles draait op de CPU. De batch analyseert **alleen nieuwe of gewijzigde opnames**: elke stap (prep, whisper,
+mfa, klanken) houdt in `werk/cache/<stap>.json` per opname bij wat eruit kwam, op basis van de inhoud (wav,
+tekst, model; bij MFA ook de woordenboekregels van de woorden). Gemeten met ±230 opnames: een volledige run
+duurt ±24 minuten, een run zonder wijzigingen ±40 seconden.
+
+- Verandert de code van een stap, dan vervalt diens cache vanzelf (de versie is een hash van het script). Wie
+  gedeelde logica in `proef_common` verandert (bv. `zet_om`), verhoogt `ANALYSE_VERSIE`.
+- Alles opnieuw: `rm -r werk/cache`. Alleen MFA opnieuw: `rm werk/cache/mfa.json`.
+- MFA past het akoestisch model per spreker aan op de opnames in de run; bij een gedeeltelijke run gebeurt dat
+  op minder opnames, dus een uitlijning kan iets anders uitvallen dan bij een volledige run.
+
+Verder: Whisper alleen in maat `small` (die gebruikt de score; zet `WHISPER_MODELLEN` in `docker-compose.yml`
+op `"tiny base small"` om maten te vergelijken), Piper en het accent-anker alleen voor nieuwe of gewijzigde
+zinnen (`_teksten.json` in `werk/piper_ruw` en `werk/anker_ruw`), en FLEURS maar één keer ophalen.
 
 ### Moedertaalsprekers: wordt een Zweed onterecht afgekeurd?
 

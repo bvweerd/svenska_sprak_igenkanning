@@ -40,20 +40,7 @@ fi
 cp "$UIT/woordenboek_standaard.dict" "$UIT/woordenboek_varianten.dict"
 grep -v '^#' /app/varianten.tsv | awk -F'\t' 'NF>=3 {print $1 "\t" $3}' >> "$UIT/woordenboek_varianten.dict"
 
-for run in standaard varianten; do
-  dict=$UIT/woordenboek_$run.dict
-  echo "== MFA align ($run)"
-  # Ruime beam: een foute uitspraak moet nog steeds uitgelijnd worden, niet overgeslagen.
-  mfa align "$CORPUS" "$dict" swedish_mfa "$UIT/$run" \
-    --clean --overwrite --output_format long_textgrid \
-    --beam 100 --retry_beam 400 --num_jobs "${MFA_JOBS:-2}"
-done
-
-# Score per uiting (log-likelihood, afwijking klankduur) schrijft MFA naast de TextGrids.
-mkdir -p /data/resultaten
-for run in standaard varianten; do
-  if [ -f "$UIT/$run/alignment_analysis.csv" ]; then
-    cp "$UIT/$run/alignment_analysis.csv" "/data/resultaten/mfa_$run.csv"
-  fi
-done
+# Uitlijnen (standaard en varianten), alleen voor nieuwe of gewijzigde opnames; voegt TextGrids en de
+# scores per uiting (resultaten/mfa_<run>.csv) samen met eerdere runs. Alles opnieuw: rm werk/cache/mfa.json
+python /app/incrementeel.py "$UIT"
 echo "Klaar: TextGrids in $UIT/{standaard,varianten}/<spreker>/<id>.TextGrid"

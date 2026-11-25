@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 
-from proef_common import ANKER, ANKER_RUW, CORPUS, EXTERN, OPNAMES, PIPER_RUW, zet_om, zinnen
+from proef_common import ANKER, ANKER_RUW, CORPUS, EXTERN, OPNAMES, PIPER_RUW, Cache, inhoud_hash, zet_om, zinnen
 
 AUDIO = {".wav", ".m4a", ".mp4", ".mp3", ".ogg", ".opus", ".flac", ".aac", ".webm", ".3gp", ".amr"}
 
@@ -41,10 +41,20 @@ def bronnen():
 
 def main():
     rijen = zinnen()
-    # Elke keer opnieuw opbouwen: weggehaalde of vervangen opnames mogen niet blijven meetellen.
-    shutil.rmtree(CORPUS, ignore_errors=True)
+    # Alleen nieuwe of gewijzigde opnames omzetten; wat er niet meer is, gaat aan het eind weg. Ongewijzigde
+    # wav's blijven byte voor byte gelijk, zodat de volgende stappen hun cache kunnen gebruiken.
+    # (zet_om staat in proef_common: verander je die, verhoog dan ANALYSE_VERSIE.)
+    cache = Cache("prep", __file__)
+    gewenst = set()
     gedaan, onbekend, plofjes = 0, [], []
     extern = 0
+
+    def al_klaar(bron, doel, tekst):
+        gewenst.update({doel, doel.with_suffix(".lab")})
+        sleutel = inhoud_hash(bron, tekst, str(doel.relative_to(CORPUS)))
+        if cache.get(sleutel) is not None and doel.exists() and doel.with_suffix(".lab").exists():
+            return True, sleutel
+        return False, sleutel
     for spreker, bron in bronnen():
         if spreker.startswith(EXTERN):
             txt = bron.with_suffix(".txt")
@@ -53,17 +63,25 @@ def main():
                 continue
             naam = re.sub(r"[^A-Za-z0-9_-]", "_", bron.stem)
             doel = CORPUS / spreker / f"{naam}.wav"
+            tekst = txt.read_text(encoding="utf-8").strip()
+            extern += 1
+            klaar, sleutel = al_klaar(bron, doel, tekst)
+            if klaar:
+                continue
             doel.parent.mkdir(parents=True, exist_ok=True)
             zet_om(bron, doel)   # zelfde schoonmaak als eigen opnames (brom eruit), voor een eerlijke ijking
-            doel.with_suffix(".lab").write_text(txt.read_text(encoding="utf-8").strip() + "\n",
-                                                encoding="utf-8")
-            extern += 1
+            doel.with_suffix(".lab").write_text(tekst + "\n", encoding="utf-8")
+            cache.put(sleutel, True)
             continue
         zin_id = bron.stem.upper()
         if zin_id not in rijen:
             onbekend.append(str(bron))
             continue
         doel = CORPUS / spreker / f"{zin_id}.wav"
+        gedaan += 1
+        klaar, sleutel = al_klaar(bron, doel, rijen[zin_id]["zweeds"])
+        if klaar:
+            continue
         doel.parent.mkdir(parents=True, exist_ok=True)
         info = zet_om(bron, doel)   # 16 kHz mono; plof bij het aanzetten en brom onder 80 Hz eruit
         if info["plof_weggehaald"] or info["veel_brom"]:
@@ -72,7 +90,15 @@ def main():
                               if info["veel_brom"] else ""))
         # MFA krijgt de verwachte (goede) zin: bij een D-opname is dat juist de test.
         doel.with_suffix(".lab").write_text(rijen[zin_id]["zweeds"] + "\n", encoding="utf-8")
-        gedaan += 1
+        cache.put(sleutel, True)
+    # Opnames die er niet meer zijn (of een andere naam kregen): uit het corpus.
+    for f in list(CORPUS.rglob("*")) if CORPUS.exists() else []:
+        if f.is_file() and f.suffix in (".wav", ".lab") and f not in gewenst:
+            f.unlink()
+    for d in list(CORPUS.iterdir()) if CORPUS.exists() else []:
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+    cache.bewaar()
     print(f"{gedaan} eigen/Piper-opnames en {extern} externe fragmenten voorbereid in {CORPUS}")
     if plofjes:
         print("Schoongemaakt:", *plofjes, sep="\n  ")

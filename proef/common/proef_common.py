@@ -419,3 +419,53 @@ def klank_oordeel(w, var=None):
     # 'fout' pas als het woord grotendeels anders klinkt én er minstens twee echte afwijkingen zijn.
     status = "fout" if score < 0.34 and len(echt) >= 2 else "let_op"
     return status, tekst
+
+
+# ---------- cache: alleen nieuwe of gewijzigde opnames opnieuw analyseren ----------
+# Per stap een JSON in werk/cache/ met {sleutel: uitkomst}. De sleutel is een hash van de inhoud (wav, tekst,
+# model …); de versie is een hash van de broncode van de stap plus ANALYSE_VERSIE. Verandert de code, dan
+# vervalt de cache vanzelf. Opnames die er niet meer zijn, vallen er bij het bewaren uit.
+
+CACHE_MAP = WERK / "cache"
+ANALYSE_VERSIE = "1"   # ophogen als gedeelde analyse-logica verandert die niet in het script van de stap staat
+
+
+def inhoud_hash(*delen):
+    """sha1 over bestanden (Path: de bytes) en teksten."""
+    import hashlib
+    h = hashlib.sha1()
+    for d in delen:
+        h.update(d.read_bytes() if isinstance(d, Path) else str(d).encode("utf-8"))
+        h.update(b"\0")
+    return h.hexdigest()
+
+
+class Cache:
+    def __init__(self, naam, script):
+        import json
+        self.naam, self.pad = naam, CACHE_MAP / f"{naam}.json"
+        self.versie = inhoud_hash(Path(script), ANALYSE_VERSIE)
+        try:
+            d = json.loads(self.pad.read_text(encoding="utf-8"))
+            self.oud = d["items"] if d.get("versie") == self.versie else {}
+        except (OSError, ValueError, KeyError):
+            self.oud = {}
+        self.nieuw, self.hits, self.missers = {}, 0, 0
+
+    def get(self, sleutel):
+        if sleutel in self.oud:
+            self.nieuw[sleutel] = self.oud[sleutel]
+            self.hits += 1
+            return self.oud[sleutel]
+        return None
+
+    def put(self, sleutel, waarde):
+        self.nieuw[sleutel] = waarde
+        self.missers += 1
+
+    def bewaar(self):
+        import json
+        self.pad.parent.mkdir(parents=True, exist_ok=True)
+        self.pad.write_text(json.dumps({"versie": self.versie, "items": self.nieuw}, ensure_ascii=False),
+                            encoding="utf-8")
+        print(f"[cache {self.naam}] {self.hits} uit de cache, {self.missers} (opnieuw) geanalyseerd", flush=True)
