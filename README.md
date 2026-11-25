@@ -174,7 +174,12 @@ onderzoeksgereedschap.
 De voorbeelden (knop Voorbeeld en „Luister en vergelijk”) komen van **Meta MMS-TTS Zweeds**
 (`facebook/mms-tts-swe`, CC BY-NC 4.0; stap `voorbeeld`, `proef/klanken/voorbeeldstem.py`). Eerst was dat Piper,
 maar alle Piper-stemmen leerden Zweeds via espeak-klanksymbolen (die schrijven de sj-klank als „s”+„x”) en
-zeggen juist de sj-klank vaak verkeerd. Gemeten met Whisper op 14 zinnen met 23 sj/tj-woorden:
+zeggen juist de sj-klank vaak verkeerd. MMS kent geen leestekens (de tokenizer laat alleen letters en spaties
+over) en las elke zin in één adem; daarom spreekt de stap elk zinsdeel apart in, knipt de stilte die MMS er zelf
+omheen zet weg en zet de delen aan elkaar met 0,25 s pauze na een komma en 0,5 s na een punt. Stukjes van minder
+dan 3 woorden gaan bij het stuk ernaast (MMS maakt van heel korte invoer bijna stilte). Een vraag klinkt nog
+steeds als een mededeling. Losse woorden laten inspreken werkt om dezelfde reden niet.
+Gemeten met Whisper op 14 zinnen met 23 sj/tj-woorden:
 
 | stem | sj/tj-woorden goed verstaan | WER |
 |---|---|---|
