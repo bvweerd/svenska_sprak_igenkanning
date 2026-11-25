@@ -424,20 +424,14 @@ async function speel(url, van, tot) {
   let start = 0, duur;
   if (van != null && tot != null) {
     // Alleen naar buiten schuiven: binnen een woord is de stilte vóór een p, t of k ook stil, en dan knip je het woord af.
-    const wVan = stilsteMoment(b, van - 0.03, van), wTot = stilsteMoment(b, tot, tot + 0.03);
-    // In- en uitloop: 150 ms ervoor en erna, maar zacht in- en uitgefaded, zodat het woord niet afgeknepen
-    // en gehaast klinkt, terwijl de buurwoorden op de achtergrond blijven.
-    const LOOP = 0.15;
-    start = Math.max(0, wVan - LOOP);
-    const eind = Math.min(b.duration, wTot + LOOP);
-    duur = eind - start;
-    const nu = audioCtx.currentTime + 0.02;
-    const op = new Float32Array(32).map((_, k) => (k / 31) ** 2), af = op.slice().reverse();
-    gain.gain.setValueAtTime(0, audioCtx.currentTime);
-    if (wVan - start > 0.01) gain.gain.setValueCurveAtTime(op, nu, wVan - start); else gain.gain.setValueAtTime(1, nu);
-    if (eind - wTot > 0.01) gain.gain.setValueCurveAtTime(af, nu + (wTot - start), eind - wTot);
-    await new Promise((klaar) => { bron.onended = klaar; bron.start(nu, start, duur); });
-    return;
+    start = stilsteMoment(b, van - 0.03, van);
+    const eind = stilsteMoment(b, tot, tot + 0.03);
+    duur = Math.min(b.duration - start, eind - start);
+    const nu = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0, nu);
+    gain.gain.linearRampToValueAtTime(1, nu + 0.01);
+    gain.gain.setValueAtTime(1, nu + Math.max(0.01, duur - 0.015));
+    gain.gain.linearRampToValueAtTime(0, nu + duur);
   }
   await new Promise((klaar) => { bron.onended = klaar; bron.start(0, start, duur); });
 }
