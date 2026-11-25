@@ -55,6 +55,9 @@ def main():
         for tg in (UIT / run).glob("*/*.TextGrid") if (UIT / run).exists() else []:
             if (tg.parent.name, tg.stem) not in uitingen:
                 tg.unlink()
+        for d in (UIT / run).iterdir() if (UIT / run).exists() else []:
+            if d.is_dir() and not any(d.iterdir()):   # spreker zonder opnames meer
+                d.rmdir()
 
     print(f"MFA: {len(uitingen) - len(te_doen)} uitingen ongewijzigd, {len(te_doen)} uit te lijnen", flush=True)
     nieuw_analyse = {run: [] for run in RUNS}
