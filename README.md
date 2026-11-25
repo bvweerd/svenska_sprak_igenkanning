@@ -48,8 +48,9 @@ alleen langs de zinnen te gaan die je nog niet hebt ingesproken. Je krijgt (`pro
   concrete instructie in Nederlandse klanken, zonder IPA. Een fout die in je opnames vaker terugkomt, gaat voor.
 - **Luister en vergelijk**: klik op een woord en je hoort eerst jezelf, dan de voorbeeldstem (MMS, zie
   „Voorbeeldstem”), geknipt op de woordtijden van MFA. Omdat die grenzen een paar honderdsten onzeker zijn
-  („på” klonk als „enpoi”), schuift de pagina elke grens tot 30 ms naar buiten naar het stilste moment, met
-  een korte fade. Alleen naar buiten: binnen een woord is de stilte vóór een p/t/k net zo stil. Losse woorden
+  („på” klonk als „enpoi”), schuift de pagina elke grens tot 30 ms naar buiten naar het stilste moment. Daaromheen
+  150 ms in- en uitloop die zacht in- en uitfadet: zonder klinkt het woord afgeknepen en gehaast, met
+  volle buurwoorden hoor je weer „enpoi”. Alleen naar buiten: binnen een woord is de stilte vóór een p/t/k net zo stil. Losse woorden
   laten inspreken door MMS werkt niet: korte woorden (på, ut, och) komen er bijna stil uit, langere als gebrom.
   Rood = daar gaat een tip over (bevestigd door meerdere modellen), oranje = één bron hoorde een fout; klik
   voor de uitleg per woord. Ook de knop Voorbeeld speelt die stem.
