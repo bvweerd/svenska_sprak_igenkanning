@@ -179,6 +179,12 @@ over) en las elke zin in één adem; daarom spreekt de stap elk zinsdeel apart i
 omheen zet weg en zet de delen aan elkaar met 0,25 s pauze na een komma en 0,5 s na een punt. Stukjes van minder
 dan 3 woorden gaan bij het stuk ernaast (MMS maakt van heel korte invoer bijna stilte). Een vraag klinkt nog
 steeds als een mededeling. Losse woorden laten inspreken werkt om dezelfde reden niet.
+MMS zegt ook sommige leenwoorden en afkortingen verkeerd (*chef*, *tv*, *sms*, *cv*, *Sverige*); een lijst met
+aangepaste spellingen alleen voor de stem is bewust niet gemaakt (geen standaardconfiguratie meer).
+Betere Zweedse stemmen (november 2026) zijn te zwaar zonder GPU: **Sten-TTS-1.7B** (Qwen3-TTS, Apache-2.0) deed
+zo'n 45 s rekenen per seconde spraak (60 zinnen ≈ 11 uur), **Chatterbox Multilingual** (0,5B, MIT, met
+watermerk) minuten per korte zin. Sten verstond Whisper wel foutloos op de drie zinnen die klaar kwamen. Met een
+GPU de moeite van opnieuw proberen waard.
 Gemeten met Whisper op 14 zinnen met 23 sj/tj-woorden:
 
 | stem | sj/tj-woorden goed verstaan | WER |
