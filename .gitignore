@@ -7,3 +7,7 @@ opnames/extern/
 opnames/*
 !opnames/.gitkeep
 resultaten/
+
+# Productieversie (app/): data en instellingen niet in git.
+app/data/
+app/.env

@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uitspraak Zweeds</title>
+<style>
+  :root { color-scheme: light dark; --goed: #1a7f37; --fout: #c62828; --letop: #b45309; --blauw: #2463eb;
+          --rand: #8884; --zacht: #8889; }
+  * { box-sizing: border-box; }
+  body { font: 17px/1.45 system-ui, sans-serif; margin: 0 auto; max-width: 42rem; padding: 1rem; }
+  h1 { font-size: 1.15rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0 0 .4rem; }
+  select, button { font: inherit; padding: .55rem .75rem; border-radius: .45rem; border: 1px solid var(--rand);
+                   background: Canvas; color: CanvasText; min-height: 2.6rem; }
+  select { width: 100%; }
+  button { cursor: pointer; }
+  button.hoofd { background: var(--blauw); color: #fff; border-color: var(--blauw); font-weight: 600; }
+  button.opname { background: var(--fout); border-color: var(--fout); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .rij { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: .6rem 0; }
+  .rij > .groei { flex: 1; min-width: 0; }
+  .kop { display: flex; gap: .6rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .kop select { width: auto; }
+  .kaart { border: 1px solid var(--rand); border-radius: .7rem; padding: 1rem; margin: .8rem 0; }
+  .klein { color: var(--zacht); font-size: .9rem; }
+  #tekst { font-size: 1.45rem; font-weight: 600; line-height: 1.5; margin: .3rem 0; }
+  #tekst.lang { font-size: 1.2rem; }
+  #nl { color: var(--zacht); }
+  #status { min-height: 1.4em; color: var(--zacht); }
+  audio { width: 100%; margin-top: .5rem; }
+  .knoppen button { flex: 1; }
+  #stukken { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .4rem; }
+  #stukken button { min-height: 2.2rem; min-width: 2.4rem; padding: .2rem .5rem; font-size: .9rem; }
+  #stukken button.hier { border: 2px solid var(--blauw); font-weight: 700; }
+  .s-top, .s-goed { background: #1a7f3730; } .s-redelijk { background: #b4530930; } .s-zwak { background: #c6282830; }
+  .eind-kop { font-size: 1.35rem; font-weight: 700; }
+  .eind.top .eind-kop, .eind.goed .eind-kop { color: var(--goed); }
+  .eind.redelijk .eind-kop { color: var(--letop); } .eind.zwak .eind-kop { color: var(--fout); }
+  .schaal { height: .45rem; border-radius: .25rem; background: var(--rand); overflow: hidden; margin: .5rem 0 .2rem; }
+  .schaal div { height: 100%; background: var(--goed); transition: width .4s; }
+  .eind.redelijk .schaal div { background: var(--letop); } .eind.zwak .schaal div { background: var(--fout); }
+  .melding { border-left: 4px solid var(--letop); background: #b4530918; padding: .5rem .7rem; border-radius: .3rem; margin-bottom: .7rem; }
+  .tip { border: 1px solid var(--rand); border-left: 4px solid var(--blauw); border-radius: .4rem; padding: .6rem .75rem; margin: .6rem 0; }
+  .tip b { display: block; margin-bottom: .2rem; }
+  .tip button { margin: .4rem .35rem 0 0; font-size: .95rem; padding: .3rem .6rem; min-height: 2.2rem; }
+  .tip .terug { font-size: .8rem; color: var(--zacht); margin-left: .4rem; font-weight: normal; }
+  #luisterwoorden { font-size: 1.25rem; line-height: 2.1; margin: .3rem 0; }
+  #luisterwoorden button { font: inherit; padding: .05rem .3rem; border: 0; border-bottom: 2px dotted var(--rand);
+                           border-radius: .25rem; background: none; color: inherit; min-height: 0; }
+  #luisterwoorden button.fout { border-bottom: 3px solid var(--fout); background: #c6282830; color: var(--fout); font-weight: 600; }
+  #luisterwoorden button.let_op { border-bottom: 2px dashed #e08a00; }
+  #luisterwoorden button.actief { background: #2463eb22; }
+  #woordinfo { border-left: 3px solid var(--rand); padding: .3rem .6rem; margin-top: .3rem; color: CanvasText; }
+  #patronenlijst li::before { content: "•"; color: var(--blauw); margin-right: .4rem; }
+  ul { padding-left: 0; list-style: none; margin: .5rem 0 0; }
+  li { padding: .3rem 0; border-top: 1px solid var(--rand); }
+  #historielijst { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .3rem; }
+  #historielijst button { font-size: .85rem; padding: .25rem .55rem; min-height: 2rem; }
+  #historielijst button.gekozen { border-color: var(--blauw); background: #2463eb22; }
+  .k-top, .k-goed { color: var(--goed); } .k-redelijk { color: var(--letop); } .k-zwak { color: var(--fout); }
+  #meter .balk { height: .4rem; border-radius: .2rem; background: var(--rand); overflow: hidden; }
+  #meter .balk div { height: 100%; width: 0; background: var(--goed); }
+  @media (hover: none) { .toetsen { display: none; } }
+</style>
+</head>
+<body>
+<div class="kop">
+  <h1>Uitspraak Zweeds</h1>
+  <select id="gebruiker" aria-label="Wie oefent er?"></select>
+</div>
+<div class="klein" id="systeem">…</div>
+
+<div class="rij klein">
+  <label for="mic">Microfoon:</label>
+  <select id="mic" class="groei" aria-label="Kies de microfoon" style="width:auto"></select>
+  <button id="mic-test" title="Toestemming geven en het niveau 3 seconden testen">Test</button>
+</div>
+<div id="meter" class="klein" hidden><div class="balk"><div id="meter-balk"></div></div><span id="meter-tekst"></span></div>
+
+<div class="kaart">
+  <div class="rij"><select id="site" aria-label="Site"></select></div>
+  <div class="rij"><select id="hoofdstuk" aria-label="Hoofdstuk"></select></div>
+  <div class="rij"><select id="tekstkeuze" aria-label="Tekst"></select></div>
+  <div class="klein" id="tekstinfo"></div>
+  <div id="stukken" aria-label="Oefenstukken"></div>
+</div>
+
+<div class="kaart" id="stukkaart">
+  <div class="klein" id="plaats"></div>
+  <div id="tekst">…</div>
+  <div id="nl"></div>
+  <div class="rij knoppen">
+    <button id="opnemen" class="hoofd" title="Opnemen / stoppen (spatie)">⏺ Opnemen</button>
+    <button id="voorbeeld" title="Zweedse voorbeeldstem">🔊 Voorbeeld</button>
+  </div>
+  <div class="rij knoppen">
+    <button id="vorige" title="Vorig stuk (←)">‹ Vorige</button>
+    <button id="volgende" title="Volgend stuk (→)">Volgende ›</button>
+  </div>
+  <audio id="speler" controls hidden></audio>
+  <div id="status"></div>
+  <div id="historie" class="klein" hidden>
+    <div>Eerdere opnames (klik om terug te kijken):</div>
+    <div id="historielijst"></div>
+  </div>
+</div>
+
+<div class="kaart" id="uitslag" hidden>
+  <div id="uitslag-tijd" class="klein"></div>
+  <div id="meldingen" class="melding" hidden></div>
+  <div id="eind" class="eind">
+    <div class="eind-kop" id="eind-kop"></div>
+    <div id="eind-zin"></div>
+    <div class="schaal" title="Nederlands accent ← → moedertaalspreker"><div id="eind-balk"></div></div>
+  </div>
+  <div id="opnieuw-analyse" hidden><button id="opnieuw-analyseren">↻ Opnieuw analyseren</button></div>
+  <div id="tips"></div>
+  <div id="luister" hidden>
+    <h2>Luister en vergelijk</h2>
+    <div class="klein">Tik op een woord: eerst hoor je jezelf, dan het voorbeeld. <b style="color:var(--fout)">Rood</b>: daar gaan de tips
+      over. <span style="border-bottom:2px dashed #e08a00">Oranje gestippeld</span>: daar hoorde één model iets, niet zeker.</div>
+    <div id="luisterwoorden"></div>
+    <div id="woordinfo" class="klein" hidden></div>
+    <div class="rij knoppen">
+      <button id="hele-eigen">▶ Jouw opname</button>
+      <button id="hele-voorbeeld">▶ Voorbeeld</button>
+    </div>
+  </div>
+  <div class="rij knoppen">
+    <button id="opnieuw" title="Hetzelfde stuk nog eens opnemen">↻ Opnieuw</button>
+    <button id="verder" class="hoofd" title="Volgend stuk (→)">Volgende ›</button>
+  </div>
+</div>
+
+<div class="kaart" id="patronen" hidden>
+  <h2>Waar je aan kunt werken</h2>
+  <ul id="patronenlijst"></ul>
+  <div class="klein" id="patronen-bron"></div>
+</div>
+<p class="klein">Microfoon werkt niet op een nieuw apparaat? <a href="/certificaat">Certificaat installeren</a>.
+  <span class="toetsen">Toetsen: spatie = opnemen/stoppen, ← → = vorig/volgend stuk.</span></p>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const opslag = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                 zet: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+let teksten = [], gebruiker = null, tekst = null, plek = 0, voortgang = {}, recorder = null, opnameStukken = [];
+let wachtend = {};   // stuk-id → naam van een opname die nog geanalyseerd wordt
+
+const SITES = { A: "A1–A2 · Svenska övningar", B: "B1–B2 · Svenska övningar B" };
+const KOPKLASSE = { top: "k-top", goed: "k-goed", redelijk: "k-redelijk", zwak: "k-zwak" };
+const opmaak = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))
+                                .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+const stuk = () => tekst && tekst.stukken[plek];
+const api = (pad) => `/api/${gebruiker}/${pad}`;
+
+async function laad() {
+  const gebr = await (await fetch("/api/gebruikers")).json();
+  for (const g of gebr) $("gebruiker").append(new Option(g.naam, g.id));
+  gebruiker = gebr.some((g) => g.id === opslag.get("gebruiker")) ? opslag.get("gebruiker") : gebr[0].id;
+  $("gebruiker").value = gebruiker;
+  teksten = (await (await fetch("/api/teksten")).json()).teksten || [];
+  if (!teksten.length) { $("tekst").textContent = "Nog geen teksten: draai eerst de import (zie app/README.md)."; return; }
+  await laadVoortgang();
+  const doel = location.hash.slice(1) || opslag.get("stuk-" + gebruiker);
+  const t = teksten.find((t) => t.stukken.some((s) => s.id === doel)) || teksten[0];
+  kiesTekst(t, Math.max(0, t.stukken.findIndex((s) => s.id === doel)));
+  laadPatronen(); status(); setInterval(status, 30000);
+}
+
+async function status() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    const uit = Object.values(s.analyses).every(Boolean) ? "analyses klaar" :
+      "analyses: " + Object.entries(s.analyses).map(([n, ok]) => `${ok ? "🟢" : "🔴"} ${n}`).join(" ");
+    const vb = s.voorbeeld ? ` · voorbeeldstem ${s.voorbeeld.klaar} van ${s.voorbeeld.totaal} stukken` : "";
+    $("systeem").textContent = uit + vb + (s.wachtrij ? ` · ${s.wachtrij} in de wachtrij` : "");
+  } catch (e) { $("systeem").textContent = "server niet bereikbaar"; }
+}
+
+async function laadVoortgang() {
+  try { voortgang = await (await fetch(api("voortgang"))).json(); } catch (e) { voortgang = {}; }
+}
+
+$("gebruiker").onchange = async (e) => {
+  gebruiker = e.target.value; opslag.zet("gebruiker", gebruiker);
+  await laadVoortgang(); vulKiezers(); toon(); laadPatronen();
+};
+
+// ---------- kiezen: site → hoofdstuk → tekst → stuk ----------
+function vulKiezers() {
+  const sites = [...new Set(teksten.map((t) => t.site))];
+  $("site").innerHTML = "";
+  for (const s of sites) $("site").append(new Option(SITES[s] || s, s));
+  $("site").value = tekst.site;
+  const hst = [...new Set(teksten.filter((t) => t.site === tekst.site).map((t) => t.hoofdstuk))];
+  $("hoofdstuk").innerHTML = "";
+  for (const h of hst) {
+    const t0 = teksten.find((t) => t.site === tekst.site && t.hoofdstuk === h);
+    $("hoofdstuk").append(new Option(`H${h} · ${t0.niveau} · ${t0.thema.split("·")[0].trim()}`, h));
+  }
+  $("hoofdstuk").value = tekst.hoofdstuk;
+  $("tekstkeuze").innerHTML = "";
+  for (const t of teksten.filter((t) => t.site === tekst.site && t.hoofdstuk === tekst.hoofdstuk)) {
+    const n = t.stukken.filter((s) => voortgang[s.id]).length;
+    $("tekstkeuze").append(new Option(`${t.soort_naam}: ${t.titel} (${n}/${t.stukken.length})`, t.id));
+  }
+  $("tekstkeuze").value = tekst.id;
+  // Bij een dialoog staat de situatie in de instructie; bij de andere teksten herhaalt titel_nl alleen de titel.
+  $("tekstinfo").textContent = tekst.soort === "dialoog" ? tekst.titel_nl : "";
+  $("stukken").innerHTML = "";
+  tekst.stukken.forEach((s, i) => {
+    const k = document.createElement("button");
+    k.textContent = i + 1;
+    const v = voortgang[s.id];
+    k.className = (i === plek ? "hier " : "") + (v ? "s-" + v.soort : "");
+    k.title = v ? `${v.kop} (${v.tijd})` : "nog niet opgenomen";
+    k.onclick = () => { plek = i; toon(); };
+    $("stukken").append(k);
+  });
+}
+
+function kiesTekst(t, i = 0) { tekst = t; plek = i; toon(); }
+$("site").onchange = (e) => kiesTekst(teksten.find((t) => t.site === e.target.value));
+$("hoofdstuk").onchange = (e) => kiesTekst(teksten.find((t) => t.site === tekst.site && t.hoofdstuk === +e.target.value));
+$("tekstkeuze").onchange = (e) => kiesTekst(teksten.find((t) => t.id === e.target.value));
+
+function ga(stap) {
+  if (recorder && recorder.state === "recording") return;
+  let i = teksten.indexOf(tekst), p = plek + stap;
+  if (p >= tekst.stukken.length) { tekst = teksten[(i + 1) % teksten.length]; p = 0; }
+  else if (p < 0) { tekst = teksten[(i - 1 + teksten.length) % teksten.length]; p = tekst.stukken.length - 1; }
+  plek = p; toon();
+  $("stukkaart").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function toon() {
+  const s = stuk();
+  history.replaceState(null, "", "#" + s.id);
+  opslag.zet("stuk-" + gebruiker, s.id);
+  vulKiezers();
+  $("plaats").textContent = `${tekst.soort_naam} · ${tekst.titel} · stuk ${plek + 1} van ${tekst.stukken.length}` +
+    (voortgang[s.id] ? ` · laatst: ${voortgang[s.id].kop}` : "");
+  $("tekst").textContent = s.tekst;
+  $("tekst").className = s.tekst.length > 160 ? "lang" : "";
+  $("nl").textContent = s.nl || "";
+  $("speler").hidden = true; $("uitslag").hidden = true; $("status").textContent = "";
+  laadHistorie(s.id);
+  if (wachtend[s.id]) volg(s.id, wachtend[s.id]);
+}
+
+$("vorige").onclick = () => ga(-1);
+$("volgende").onclick = () => ga(1);
+$("verder").onclick = () => ga(1);
+$("opnieuw").onclick = () => { $("uitslag").hidden = true; $("opnemen").click(); };
+document.querySelectorAll("button").forEach((b) => b.addEventListener("click", (e) => { if (e.detail) b.blur(); }));
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || /^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.target.tagName === "BUTTON" && (e.key === " " || e.key === "Enter")) return;
+  if (e.key === " ") { e.preventDefault(); if (!$("opnemen").disabled) $("opnemen").click(); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); ga(1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); ga(-1); }
+});
+
+$("voorbeeld").onclick = async () => {
+  try { await speel("/api/voorbeeld/" + stuk().id); }
+  catch (e) {
+    // Nog geen voorbeeld (de voorbeeldstem werkt de teksten één voor één af): de stem van de browser.
+    $("status").textContent = "Het voorbeeld van dit stuk wordt nog gemaakt; nu de stem van je browser.";
+    const u = new SpeechSynthesisUtterance(stuk().tekst);
+    u.lang = "sv-SE";
+    const v = speechSynthesis.getVoices().find((v) => v.lang.replace("_", "-").startsWith("sv"));
+    if (v) u.voice = v;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }
+};
+
+// ---------- microfoon ----------
+let micInfo = null, meterStop = null;
+const micId = () => $("mic").value || "";
+async function vulMics(actief) {
+  const lijst = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+  const gekozen = actief || micId() || opslag.get("mic") || "";
+  $("mic").innerHTML = "";
+  for (const d of lijst) {
+    const naam = d.label || "microfoon (naam na toestemming)";
+    $("mic").append(new Option(d.deviceId === "default" ? `Standaard – ${naam.replace(/^Default - |^Standaard - /, "")}` : naam, d.deviceId));
+  }
+  if (gekozen && lijst.some((d) => d.deviceId === gekozen)) $("mic").value = gekozen;
+}
+function startMeter(stream) {
+  const ctx = new AudioContext(), an = ctx.createAnalyser();
+  ctx.createMediaStreamSource(stream).connect(an);
+  const buf = new Float32Array(an.fftSize);
+  let piek = -100, loopt = true;
+  const stap = () => {
+    if (!loopt) return;
+    an.getFloatTimeDomainData(buf);
+    const db = 20 * Math.log10(Math.sqrt(buf.reduce((s, x) => s + x * x, 0) / buf.length) + 1e-9);
+    piek = Math.max(piek, db);
+    $("meter-balk").style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + "%";
+    $("meter-tekst").textContent = `${Math.round(db)} dB (hoogste ${Math.round(piek)} dB)`;
+    requestAnimationFrame(stap);
+  };
+  stap(); $("meter").hidden = false;
+  meterStop = () => {
+    loopt = false; ctx.close();
+    $("meter-tekst").textContent = `hoogste niveau ${Math.round(piek)} dB` +
+      (piek < -30 ? " — erg zacht: kies een andere microfoon of zet hem harder" : "");
+    if (micInfo) micInfo.piek_db = Math.round(piek);
+  };
+}
+function stopMeter() { if (meterStop) meterStop(); meterStop = null; }
+const geenMic = (e) => "Geen microfoon: " + e.message +
+  (window.isSecureContext ? "" : " — open de trainer via https (en installeer zo nodig het certificaat, zie onderaan).");
+$("mic").onchange = (e) => opslag.zet("mic", e.target.value);
+$("mic-test").onclick = async () => {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: {
+      ...(micId() ? { deviceId: { exact: micId() } } : {}), echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const t = s.getAudioTracks()[0];
+    await vulMics(t.getSettings().deviceId);
+    micInfo = { naam: t.label, ...t.getSettings() };
+    startMeter(s);
+    $("status").textContent = `Test met: ${t.label} — zeg iets…`;
+    setTimeout(() => { stopMeter(); s.getTracks().forEach((x) => x.stop()); }, 3000);
+  } catch (e) { $("status").textContent = geenMic(e); }
+};
+if (navigator.mediaDevices) vulMics();
+function mimeType() {
+  for (const t of ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"])
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  return "";
+}
+
+// ---------- opnemen en versturen ----------
+$("opnemen").onclick = async () => {
+  if (recorder && recorder.state === "recording") { recorder.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      ...(micId() ? { deviceId: { exact: micId() } } : {}),
+      channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const track = stream.getAudioTracks()[0];
+    micInfo = { naam: track.label, ...track.getSettings() };
+    vulMics(track.getSettings().deviceId);
+    startMeter(stream);
+    const type = mimeType();
+    recorder = new MediaRecorder(stream, type ? { mimeType: type } : {});
+    opnameStukken = [];
+    const s = stuk();
+    recorder.ondataavailable = (e) => e.data.size && opnameStukken.push(e.data);
+    recorder.onstop = () => { stopMeter(); stream.getTracks().forEach((t) => t.stop()); verstuur(s); };
+    $("uitslag").hidden = true;
+    $("opnemen").disabled = true; $("opnemen").textContent = "Microfoon aan…";
+    await new Promise((r) => setTimeout(r, 700));     // een headset geeft bij het aanzetten een plof
+    recorder.start();
+    $("opnemen").disabled = false;
+    $("opnemen").textContent = "⏹ Stop"; $("opnemen").className = "opname";
+    $("status").textContent = `🔴 Lees nu voor (microfoon: ${micInfo.naam || "standaard"}). Druk daarna op Stop.`;
+  } catch (e) { $("status").textContent = geenMic(e); $("opnemen").disabled = false; }
+};
+
+async function verstuur(s) {
+  $("opnemen").textContent = "⏺ Opnemen"; $("opnemen").className = "hoofd";
+  const blob = new Blob(opnameStukken, { type: recorder.mimeType || "audio/webm" });
+  $("speler").src = URL.createObjectURL(blob); $("speler").hidden = false;
+  $("status").textContent = "Versturen…";
+  try {
+    const resp = await fetch(`/api/opname?gebruiker=${gebruiker}&stuk=${s.id}`, {
+      method: "POST", body: blob,
+      headers: { "Content-Type": blob.type, "X-Microfoon": encodeURIComponent(JSON.stringify(micInfo || {})) } });
+    const uit = await resp.json();
+    if (!resp.ok) throw new Error(uit.fout || resp.status);
+    wachtend[s.id] = uit.naam;
+    volg(s.id, uit.naam);
+    laadHistorie(s.id);
+  } catch (e) { $("status").textContent = "Mislukt: " + e.message; }
+}
+
+// Wacht op de analyse (de server doet er één tegelijk); toont de uitslag als je nog bij dit stuk bent.
+const STAP = { whisper: "verstaan", klanken: "klanken", mfa: "uitlijnen" };
+async function volg(stukId, naam) {
+  const t0 = Date.now();
+  while (wachtend[stukId] === naam) {
+    let d;
+    try { d = await (await fetch(api("analyse/" + naam))).json(); } catch (e) { d = { status: "wachtrij" }; }
+    const hier = stuk() && stuk().id === stukId;
+    if (d.status === "klaar") {
+      delete wachtend[stukId];
+      voortgang[stukId] = { kop: d.eindoordeel.kop, soort: d.eindoordeel.soort, tijd: d.tijd };
+      if (hier) { toonUitslag(d); $("status").textContent = `Klaar (analyse ${d.sec} s).`; vulKiezers(); laadHistorie(stukId, naam); }
+      laadPatronen();
+      return;
+    }
+    if (d.status === "mislukt" || d.fout && !d.status) {
+      delete wachtend[stukId];
+      if (hier) $("status").textContent = "De analyse is mislukt: " + (d.fout || "") ;
+      return;
+    }
+    const sec = Math.round((Date.now() - t0) / 1000);
+    if (hier) $("status").textContent = d.status === "bezig"
+      ? `Analyseren: ${STAP[d.stap] || d.stap}… (${sec} s; op deze server duurt het even)`
+      : `In de wachtrij (plek ${d.plek})… Je kunt al verder met het volgende stuk; de uitslag komt bij Eerdere opnames.`;
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+}
+
+// ---------- luisteren ----------
+let audioCtx = null, laatste = null, bron = null;
+const buffers = {};
+async function buffer(url) {
+  audioCtx = audioCtx || new AudioContext();
+  if (!buffers[url]) buffers[url] = (async () => {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("geen audio");
+    return audioCtx.decodeAudioData(await r.arrayBuffer());
+  })();
+  try { return await buffers[url]; } catch (e) { delete buffers[url]; throw e; }
+}
+async function speel(url, van, tot) {
+  // Een stuk van een opname; de grenzen schuiven naar het stilste moment vlak buiten de woordgrens van MFA.
+  const b = await buffer(url);
+  if (bron) { try { bron.stop(); } catch (e) {} }
+  bron = audioCtx.createBufferSource(); bron.buffer = b;
+  const gain = audioCtx.createGain();
+  bron.connect(gain); gain.connect(audioCtx.destination);
+  let start = 0, duur;
+  if (van != null && tot != null) {
+    start = stilsteMoment(b, van - 0.03, van);
+    const eind = stilsteMoment(b, tot, tot + 0.03);
+    duur = Math.min(b.duration - start, eind - start);
+    const nu = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0, nu);
+    gain.gain.linearRampToValueAtTime(1, nu + 0.01);
+    gain.gain.setValueAtTime(1, nu + Math.max(0.01, duur - 0.015));
+    gain.gain.linearRampToValueAtTime(0, nu + duur);
+  }
+  await new Promise((klaar) => { bron.onended = klaar; bron.start(0, start, duur); });
+}
+function stilsteMoment(b, van, tot) {
+  const x = b.getChannelData(0), sr = b.sampleRate, n = Math.round(0.01 * sr), stap = Math.round(0.0025 * sr);
+  let best = Math.max(0, Math.min(b.duration, (van + tot) / 2)), laagst = Infinity;
+  for (let a = Math.max(0, Math.round(van * sr - n / 2)); a + n <= Math.min(x.length, Math.round(tot * sr + n / 2)); a += stap) {
+    let e = 0;
+    for (let k = a; k < a + n; k++) e += x[k] * x[k];
+    if (e < laagst) { laagst = e; best = (a + n / 2) / sr; }
+  }
+  return best;
+}
+async function vergelijk(i) {
+  const w = laatste && laatste.woorden[i];
+  if (!w) return;
+  const knop = $("luisterwoorden").children[i];
+  knop && knop.classList.add("actief");
+  try {
+    if (w.eigen) await speel(laatste.audio.eigen, ...w.eigen);
+    await new Promise((r) => setTimeout(r, 300));
+    if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld);
+  } finally { knop && knop.classList.remove("actief"); }
+}
+
+// ---------- uitslag ----------
+function toonUitslag(uit) {
+  laatste = uit;
+  const e = uit.eindoordeel || {}, s = uit.score || {};
+  $("uitslag-tijd").textContent = "";
+  $("eind").className = "eind " + (e.soort || "");
+  $("eind-kop").textContent = e.kop || "";
+  $("eind-zin").textContent = e.zin || "";
+  $("eind-balk").style.width = Math.max(3, s.gelijkenis ?? 0) + "%";
+  const meld = [...(uit.meldingen || []), ...(uit.fouten || []).map((f) => "Analyse mislukt: " + f)];
+  $("meldingen").hidden = !meld.length;
+  $("meldingen").textContent = "⚠ " + meld.join(" ");
+  $("opnieuw-analyse").hidden = !(uit.fouten || []).length;
+  $("opnieuw-analyseren").onclick = async () => {
+    const r = await (await fetch(`/api/opnieuw/${uit.naam}?gebruiker=${gebruiker}`, { method: "POST" })).json();
+    $("uitslag").hidden = true; wachtend[uit.stuk] = r.naam; volg(uit.stuk, r.naam);
+  };
+  toonTips(uit); toonLuister(uit);
+  $("uitslag").hidden = false;
+  $("uitslag").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+function toonTips(uit) {
+  $("tips").innerHTML = "";
+  for (const t of uit.tips || []) {
+    const d = document.createElement("div");
+    d.className = "tip";
+    d.innerHTML = `<b>${opmaak(t.titel)}${t.terugkerend ? '<span class="terug">komt vaker terug</span>' : ""}</b>${opmaak(t.uitleg)}`;
+    const nrs = (t.woorden || [t.woord]).filter((i) => i != null && uit.woorden[i] && (uit.woorden[i].eigen || uit.woorden[i].voorbeeld));
+    if (nrs.length) d.append(document.createElement("br"));
+    for (const i of nrs) {
+      const k = document.createElement("button");
+      k.textContent = `▶ „${uit.woorden[i].tekst.replace(/[.,!?;:]+$/, "")}”`;
+      k.onclick = () => vergelijk(i);
+      d.append(k);
+    }
+    $("tips").append(d);
+  }
+}
+function toonLuister(uit) {
+  const tipwoorden = new Set((uit.tips || []).flatMap((t) => t.woorden || [t.woord]));
+  $("luister").hidden = !(uit.woorden || []).some((w) => w.eigen);
+  $("luisterwoorden").innerHTML = "";
+  $("woordinfo").hidden = true;
+  (uit.woorden || []).forEach((w, i) => {
+    const k = document.createElement("button");
+    k.textContent = w.tekst;
+    // Rood: hier gaat een tip over. Oranje: één bron hoorde een fout. 'Let op' (Whisper twijfelde): geen kleur.
+    k.className = tipwoorden.has(i) ? "fout" : w.status === "fout" ? "let_op" : "";
+    k.disabled = !w.eigen && !w.voorbeeld;
+    k.onclick = () => {
+      const naam = w.tekst.replace(/[.,!?;:]+$/, "");
+      $("woordinfo").hidden = false;
+      $("woordinfo").innerHTML = `<b>${opmaak(naam)}</b>: ` + (w.uitleg && w.uitleg.length ? w.uitleg.map(opmaak).join(" · ") : "niets opvallends.");
+      vergelijk(i);
+    };
+    $("luisterwoorden").append(k, " ");
+  });
+  $("hele-eigen").onclick = () => speel(uit.audio.eigen);
+  $("hele-voorbeeld").hidden = !uit.audio.voorbeeld;
+  $("hele-voorbeeld").onclick = () => speel(uit.audio.voorbeeld);
+}
+
+async function laadPatronen() {
+  let pat = [];
+  try { pat = await (await fetch(api("patronen"))).json(); } catch (e) {}
+  $("patronen").hidden = !pat.length;
+  $("patronenlijst").innerHTML = "";
+  for (const p of pat) {
+    const li = document.createElement("li");
+    li.innerHTML = `<b>${opmaak(p.titel)}</b> — ${p.aantal}× (${p.voorbeelden.map((w) => `<em>${opmaak(w)}</em>`).join(", ")})<br>` +
+                   `<span class="klein">${opmaak(p.uitleg)}</span>`;
+    $("patronenlijst").append(li);
+  }
+  if (pat.length) $("patronen-bron").textContent = `Op basis van je laatste opname van ${pat[0].opnames} recent geoefende stukken.`;
+}
+
+async function laadHistorie(stukId, gekozen) {
+  let lijst = [];
+  try { lijst = await (await fetch(api("geschiedenis/" + stukId))).json(); } catch (e) {}
+  if (stuk().id !== stukId) return;
+  $("historie").hidden = !lijst.length;
+  $("historielijst").innerHTML = "";
+  for (const h of lijst) {
+    const k = document.createElement("button");
+    k.innerHTML = h.klaar ? `${h.tijd} · <span class="${KOPKLASSE[h.soort] || ""}">${opmaak(h.kop)}</span>` +
+                            (h.schaal != null ? ` (${h.schaal})` : "")
+                          : `${h.tijd} · ${h.fout ? "mislukt" : "wordt geanalyseerd"}`;
+    if (h.naam === gekozen) k.className = "gekozen";
+    k.onclick = () => bekijk(h.naam, k);
+    $("historielijst").append(k);
+  }
+}
+async function bekijk(naam, knop) {
+  const d = await (await fetch(api("analyse/" + naam))).json();
+  if (d.status !== "klaar") { wachtend[stuk().id] = naam; return volg(stuk().id, naam); }
+  toonUitslag(d);
+  $("uitslag-tijd").textContent = `Opname van ${d.tijd}` + (d.microfoon && d.microfoon.naam ? ` · ${d.microfoon.naam}` : "");
+  [...$("historielijst").children].forEach((b) => b.classList.toggle("gekozen", b === knop));
+}
+
+laad();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# HTTPS met een eigen certificaat (Caddy's interne CA). Nodig omdat browsers de microfoon alleen vrijgeven op
+# https:// of localhost. Het rootcertificaat staat daarna in data/caddy/caddy/pki/authorities/local/root.crt en is
+# te downloaden via /certificaat op de trainer.
+{
+	# Geen poging om het rootcertificaat in de container zelf te installeren.
+	skip_install_trust
+	auto_https disable_redirects
+}
+
+{$SITE_ADRESSEN} {
+	tls internal
+	reverse_proxy web:8080
+	# Lange opnames en trage analyses: ruime limieten.
+	request_body {
+		max_size 50MB
+	}
+}

@@ -6,6 +6,8 @@ ENV WHISPER_MODELLEN=${WHISPER_MODELLEN}
 WORKDIR /app
 COPY whisper/download.py ./
 RUN python download.py ${WHISPER_MODELLEN}
+# Getallen die Whisper in cijfers schrijft, in woorden vergelijken (productieversie: teksten met getallen).
+RUN pip install --no-cache-dir num2words==0.5.14
 COPY common/proef_common.py whisper/transcribe.py ./
 ENV HF_HOME=/tmp/hf HF_HUB_OFFLINE=1
 CMD ["python", "transcribe.py"]

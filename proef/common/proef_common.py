@@ -17,9 +17,34 @@ RESULTATEN = DATA / "resultaten"    # CSV's en verslag
 
 
 def zinnen():
-    """Alle rijen uit testzinnen.tsv als dicts, op id."""
+    """Alle rijen uit testzinnen.tsv als dicts, op id. Zonder testzinnen.tsv (productieversie, app/): leeg."""
+    if not TSV.exists():
+        return {}
     with open(TSV, encoding="utf-8", newline="") as f:
         return {r["id"]: r for r in csv.DictReader(f, delimiter="\t")}
+
+
+def rij_voor_verzoek(verzoek, rijen):
+    """De zin bij een API-verzoek. De productieversie (app/) stuurt de tekst zelf mee ("tekst"); de proef
+    alleen het id uit testzinnen.tsv."""
+    if verzoek.get("tekst"):
+        return {"id": verzoek.get("id", ""), "deel": "P productie", "zweeds": verzoek["tekst"], "gezegd": "",
+                "goed_id": "", "nederlands": "", "wat_meten": "", "opdracht": ""}
+    return rijen[verzoek["id"]]
+
+
+def woordenboek_extra():
+    """Uitspraken voor woorden die niet in het MFA-woordenboek staan (gemaakt met MFA's G2P door
+    app/woordenboek): [(woord, uitspraak)]. Leeg als het bestand er niet is."""
+    pad = Path(os.environ.get("WOORDENBOEK_EXTRA", DATA / "woordenboek_extra.dict"))
+    if not pad.exists():
+        return []
+    uit = []
+    for regel in pad.read_text(encoding="utf-8").splitlines():
+        delen = regel.split("\t")
+        if len(delen) >= 2 and delen[0].strip():
+            uit.append((delen[0].strip(), delen[-1].strip()))
+    return uit
 
 
 EXTERN = "extern-"   # sprekermap in het corpus voor opnames van moedertaalsprekers
@@ -98,11 +123,23 @@ def zet_om(bron, doel):
             "veel_brom": brom > spraak + 3 and brom > -40, "zacht": spraak < -45}
 
 
+def _getal(w):
+    """Een getal dat Whisper in cijfers schreef, in woorden (zoals de import van de productieversie doet);
+    zonder num2words (de proefimages) blijft het staan."""
+    if w in GELIJKE_VORMEN or not w.isdigit():
+        return GELIJKE_VORMEN.get(w, w)
+    try:
+        from num2words import num2words
+        return num2words(int(w), lang="sv")
+    except (ImportError, NotImplementedError, ValueError, OverflowError):
+        return w
+
+
 def normaliseer(tekst):
     """Kleine letters, zonder leestekens; voor het vergelijken van zinnen."""
     tekst = unicodedata.normalize("NFC", tekst.lower())
     tekst = re.sub(r"[^\w\s]", " ", tekst)
-    return " ".join(GELIJKE_VORMEN.get(w, w) for w in tekst.split())
+    return " ".join(_getal(w) for w in tekst.split())
 
 
 def bewerkingen(a, b):
@@ -216,7 +253,7 @@ KLANK_MODELLEN = ("xlsr300m-sv", "xlsr53-espeak")
 # Mediaan foutpercentage (PER) van moedertaalsprekers per model; wordt bij de ijking opnieuw gemeten.
 NATIVE_PER = {"xlsr300m-sv": 0.25, "xlsr53-espeak": 0.40}
 KLANK_GEWICHT = {"xlsr300m-sv": 0.75, "xlsr53-espeak": 0.25}
-IJKING = WERK / "score_ijking.json"
+IJKING = Path(os.environ.get("IJKING", WERK / "score_ijking.json"))   # productie: bevroren kopie
 ACCENT_NAAM = "Nederlands accent"   # het 0-punt van de schaal
 
 
@@ -313,7 +350,7 @@ def vergelijk(ruw, ijking):
 # wijken daar voortdurend van af (zo bleek ook in een Nederlandse controle: g als [x], r als [ɾ], v als [f]). Daarom leert de
 # batch uit de moedertaalsprekers (FLEURS) welke afwijkingen normaal zijn; die tellen per woord niet als fout.
 
-KLANK_VARIANTEN = WERK / "klank_varianten.json"
+KLANK_VARIANTEN = Path(os.environ.get("KLANK_VARIANTEN", WERK / "klank_varianten.json"))
 KLANK_PER_WOORD = WERK / "klanken_per_woord.json"
 VARIANT_MIN_N = 3          # minstens zo vaak bij moedertaalsprekers gezien …
 VARIANT_MIN_AANDEEL = 0.10  # … en bij minstens dit aandeel van die verwachte klank (of van de woorden, bij 'extra')

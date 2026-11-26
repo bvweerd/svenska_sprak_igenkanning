@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from analyse import analyseer_opname, f0_kenmerken, lees_varianten
-from proef_common import WERK, serveer, zinnen
+from proef_common import WERK, rij_voor_verzoek, serveer, woordenboek_extra, zinnen
 
 import numpy as np
 
@@ -15,14 +15,25 @@ WB = Path(os.environ["MFA_ROOT_DIR"]) / "pretrained_models" / "dictionary" / "sw
 MAP = WERK / "web" / "mfa"
 
 
-def varianten_woordenboek():
+def met_extra(naam, basis, aanvulling=""):
+    """Het woordenboek plus de G2P-uitspraken van woorden die er niet in staan (app/woordenboek)."""
     MAP.mkdir(parents=True, exist_ok=True)
-    pad = MAP / "woordenboek_varianten.dict"
+    pad = MAP / naam
+    extra = "".join(f"{w}\t{u}\n" for w, u in woordenboek_extra())
+    inhoud = basis + aanvulling + extra
+    if not pad.exists() or pad.read_text(encoding="utf-8") != inhoud:
+        pad.write_text(inhoud, encoding="utf-8")
+    return pad
+
+
+def varianten_regels():
     regels = [r.split("\t") for r in Path("/app/varianten.tsv").read_text(encoding="utf-8").splitlines()
               if r.strip() and not r.startswith("#")]
-    pad.write_text(WB.read_text(encoding="utf-8") + "".join(f"{r[0]}\t{r[2]}\n" for r in regels),
-                   encoding="utf-8")
-    return pad
+    return "".join(f"{r[0]}\t{r[2]}\n" for r in regels)
+
+
+def varianten_woordenboek():
+    return met_extra("woordenboek_varianten.dict", WB.read_text(encoding="utf-8"), varianten_regels())
 
 
 def lijn_uit(wav, tekst, woordenboek, naam):
@@ -52,15 +63,21 @@ def lijn_uit(wav, tekst, woordenboek, naam):
 def main():
     subprocess.run(["mfa", "server", "start"], capture_output=True)
     var = lees_varianten()
-    wb_var = varianten_woordenboek()
+    wb_basis = WB.read_text(encoding="utf-8")
     rijen_tsv = zinnen()
 
     def analyseer(v):
         t0 = time.perf_counter()
-        r = rijen_tsv[v["id"]]
-        tg_s, methode = lijn_uit(v["wav"], r["zweeds"], WB, "standaard")
-        tg_v, _ = lijn_uit(v["wav"], r["zweeds"], wb_var, "varianten")
-        keuze, woorden, klinkers, stem = analyseer_opname("web", v["id"], r["deel"][0], v["wav"],
+        r = rij_voor_verzoek(v, rijen_tsv)
+        wb_s = met_extra("woordenboek_standaard.dict", wb_basis)
+        tg_s, methode = lijn_uit(v["wav"], r["zweeds"], wb_s, "standaard")
+        # Alleen woordtijden nodig (de voorbeeldstem van de productieversie): de variantuitlijning overslaan.
+        if v.get("alleen_tijden"):
+            _, woorden, _, _ = analyseer_opname("web", v.get("id", ""), r["deel"][0], v["wav"], tg_s, tg_s, var)
+            return {"woorden": [{"woord": w["woord"], "start": w["start"], "duur_ms": w["duur_ms"]} for w in woorden],
+                    "methode": methode, "sec": round(time.perf_counter() - t0, 1)}
+        tg_v, _ = lijn_uit(v["wav"], r["zweeds"], varianten_woordenboek(), "varianten")
+        keuze, woorden, klinkers, stem = analyseer_opname("web", v.get("id", ""), r["deel"][0], v["wav"],
                                                           tg_s, tg_v, var)
         ref = float(np.median(stem)) if len(stem) else None
         woorden = [f0_kenmerken(w, ref) for w in woorden]

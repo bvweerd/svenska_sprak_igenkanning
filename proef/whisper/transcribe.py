@@ -15,7 +15,8 @@ import wave
 import numpy as np
 from faster_whisper import WhisperModel
 
-from proef_common import RESULTATEN, Cache, inhoud_hash, foutpercentage, normaliseer, opnames, schrijf_csv, serveer, zin_voor, zinnen
+from proef_common import (RESULTATEN, Cache, inhoud_hash, foutpercentage, normaliseer, opnames, rij_voor_verzoek,
+                          schrijf_csv, serveer, zin_voor, zinnen)
 
 MODELLEN = os.environ.get("WHISPER_MODELLEN", "tiny base small").split()
 MAP = os.environ.get("WHISPER_MAP", "/modellen")
@@ -85,7 +86,7 @@ def server():
     maat = os.environ.get("WHISPER_API_MODEL", "small")
     model = laad(maat)
     rijen_tsv = zinnen()
-    serveer(lambda v: analyseer(model, maat, "web", v["id"], v["wav"], rijen_tsv[v["id"]]), 8001)
+    serveer(lambda v: analyseer(model, maat, "web", v.get("id", ""), v["wav"], rij_voor_verzoek(v, rijen_tsv)), 8001)
 
 
 if __name__ == "__main__":

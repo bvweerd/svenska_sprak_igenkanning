@@ -1,5 +1,8 @@
 # Svenska språkigenkänning (proef)
 
+> **Productieversie:** de uitspraaktrainer voor thuis (A- en B-site, twee gebruikers, lichte server) staat in
+> [`app/`](app/README.md); het plan in [`PLAN_PRODUCTIE.md`](PLAN_PRODUCTIE.md). Deze README beschrijft de proef.
+
 Proef met lokale modellen (Docker) voor Zweedse spraakherkenning en uitspraakcontrole, met als doel op termijn
 spreekopdrachten in de oefensite. `PLAN.md` beschrijft kandidaten, opzet en criteria; `testzinnen.tsv` wat er
 ingesproken wordt: proefzinnen (C), zinnen op niveau A1 (F) en A2 (G), een korte leestekst (T: per zin en in

@@ -1,0 +1,116 @@
+# Uitspraaktrainer Zweeds — productieversie voor een lichte server thuis (zie app/README.md).
+#
+#   cp .env.voorbeeld .env              # adres, poort en gebruikers invullen
+#   docker compose build
+#   docker compose --profile bijwerken run --rm importeer      # teksten van de A- en B-site
+#   docker compose --profile bijwerken run --rm woordenboek    # uitspraak van namen e.d. (MFA-G2P)
+#   docker compose up -d                                       # trainer + voorbeeldstem op de achtergrond
+#
+# De analysemodellen zijn dezelfde images als in de proef (proef/…). Alles draait als uid 1000; data/ moet
+# voor die gebruiker schrijfbaar zijn. CPU- en geheugengrenzen houden de rest van de server (Home Assistant)
+# bruikbaar: één analyse tegelijk, de drie modellen na elkaar, de voorbeeldstem op 1 kern met lage prioriteit.
+
+x-altijd: &altijd
+  restart: unless-stopped
+  user: "1000:1000"
+
+services:
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    user: "1000:1000"
+    ports: ["${HTTPS_POORT:-8443}:${HTTPS_POORT:-8443}"]
+    environment:
+      SITE_ADRESSEN: ${SITE_ADRESSEN:-https://localhost:8443}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+      - ./data/caddy-config:/config
+    mem_limit: 128m
+    depends_on: [web]
+
+  web:
+    <<: *altijd
+    build: { context: .., dockerfile: app/web/Dockerfile }
+    image: uitspraak/web
+    environment:
+      GEBRUIKERS: ${GEBRUIKERS:-Gebruiker 1,Gebruiker 2}
+      IJKING: /ijking/score_ijking.json
+      KLANK_VARIANTEN: /ijking/klank_varianten.json
+    ports: ["127.0.0.1:${WEB_POORT:-8090}:8080"]     # alleen op de server zelf (zonder microfoon: alleen kijken)
+    volumes:
+      - ./data:/data
+      - ./data/caddy:/caddy:ro                       # rootcertificaat voor /certificaat
+      # Bevroren ijking uit de proef (moedertaalsprekers = 100, Nederlands accent = 0).
+      - ./ijking:/ijking:ro
+    cpus: 1
+    mem_limit: 512m
+    depends_on: [whisper-api, klanken-api, mfa-api]
+
+  whisper-api:
+    <<: *altijd
+    build:
+      context: ../proef
+      dockerfile: whisper/Dockerfile
+      args: { WHISPER_MODELLEN: "small" }
+    image: proef-sv/whisper
+    command: ["python", "transcribe.py", "--server"]
+    environment:
+      WHISPER_API_MODEL: small
+      WHISPER_THREADS: ${ANALYSE_KERNEN:-3}
+    volumes: [./data:/data]
+    cpus: ${ANALYSE_KERNEN:-3}
+    mem_limit: 1500m
+
+  klanken-api:
+    <<: *altijd
+    build: { context: ../proef, dockerfile: klanken/Dockerfile }
+    image: proef-sv/klanken
+    command: ["python", "klanken.py", "--server"]
+    environment:
+      KLANKEN_THREADS: ${ANALYSE_KERNEN:-3}
+    volumes: [./data:/data]
+    cpus: ${ANALYSE_KERNEN:-3}
+    mem_limit: 3g
+
+  mfa-api:
+    <<: *altijd
+    build: { context: ../proef, dockerfile: mfa/Dockerfile }
+    image: proef-sv/mfa
+    command: ["python", "api.py"]
+    shm_size: "1gb"
+    volumes: [./data:/data]
+    cpus: ${ANALYSE_KERNEN:-3}
+    mem_limit: 2g
+
+  voorbeeld:                        # voorbeeldstem (MMS) voor alle stukken, op de achtergrond
+    <<: *altijd
+    image: proef-sv/klanken
+    command: ["python", "/app/maak.py"]
+    volumes:
+      - ./data:/data
+      - ./voorbeeld/maak.py:/app/maak.py:ro
+    cpus: 1
+    mem_limit: 1500m
+    depends_on: [klanken-api, mfa-api, web]
+
+  # ---------- bijwerken (alleen met 'docker compose --profile bijwerken run') ----------
+  importeer:
+    build: { context: ., dockerfile: importeer/Dockerfile }
+    image: uitspraak/importeer
+    user: "1000:1000"
+    volumes:
+      - ${BRON_A:-../../svenska_ovningar}:/bron/a:ro
+      - ${BRON_B:-../../svenska_ovningar_b}:/bron/b:ro
+      - ./data:/data
+    profiles: [bijwerken]
+
+  woordenboek:
+    image: proef-sv/mfa
+    user: "1000:1000"
+    command: ["python", "/app/woordenboek.py"]
+    shm_size: "1gb"
+    volumes:
+      - ./data:/data
+      - ./woordenboek/maak.py:/app/woordenboek.py:ro
+    profiles: [bijwerken]

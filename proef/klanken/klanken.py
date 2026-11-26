@@ -22,7 +22,7 @@ import torch
 from transformers import AutoProcessor, Wav2Vec2ForCTC
 
 from proef_common import (Cache, inhoud_hash, KLANK_PER_WOORD, KLANK_VARIANTEN, RESULTATEN, bewerkingen, leer_varianten, foutpercentage, normaliseer, opnames, ops_tekst,
-                          schrijf_csv, serveer, zin_voor, zinnen)
+                          rij_voor_verzoek, schrijf_csv, serveer, woordenboek_extra, zin_voor, zinnen)
 
 MODELLEN = {
     "xlsr53-espeak": "/modellen/wav2vec2-xlsr-53-espeak-cv-ft",
@@ -202,12 +202,21 @@ def main():
 
 
 def server():
-    torch.set_num_threads(os.cpu_count() or 2)
+    # KLANKEN_THREADS: zoveel kernen als de container krijgt (productie: een lichte server). Meer threads dan
+    # kernen maakt het juist trager (gemeten: 16 threads op 2 kernen, 62 s in plaats van ±15 s).
+    torch.set_num_threads(int(os.environ.get("KLANKEN_THREADS", 0)) or os.cpu_count() or 2)
     wb = lees_woordenboek()
     rijen_tsv = zinnen()
     modellen = laad_alle()
-    serveer(lambda v: {naam: analyseer(naam, m, p, wb, "web", v["id"], v["wav"], rijen_tsv[v["id"]])
-                       for naam, (m, p) in modellen.items()}, 8002)
+
+    def analyseer_verzoek(v):
+        # Woorden die niet in het woordenboek staan (namen in de teksten): uit MFA's G2P (app/woordenboek).
+        for woord, uitspraak in woordenboek_extra():
+            wb.setdefault(woord, uitspraak.split())
+        r = rij_voor_verzoek(v, rijen_tsv)
+        return {naam: analyseer(naam, m, p, wb, "web", v.get("id", ""), v["wav"], r) for naam, (m, p) in modellen.items()}
+
+    serveer(analyseer_verzoek, 8002)
 
 
 if __name__ == "__main__":
