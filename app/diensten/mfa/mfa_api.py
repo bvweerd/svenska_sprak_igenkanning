@@ -1,18 +1,22 @@
-"""MFA als API voor de webpagina: één opname uitlijnen (standaard en met varianten) en meteen
-keuze-uitspraak, duur en toonhoogte bepalen (zelfde code als de batchstap 'prosodie')."""
+"""Montreal Forced Aligner als interne API: één opname uitlijnen en woordgrenzen en keuze-uitspraak teruggeven.
+
+POST {"wav": pad, "id": stuk-id, "tekst": tekst[, "alleen_tijden": true]} → {"woorden": [...], "keuze": [...]}
+- woorden: begin en duur per woord (standaarduitlijning), voor „Luister en vergelijk” en de woordtijden van het
+  voorbeeld ('alleen_tijden': dan niets anders);
+- keuze: bij de woorden uit varianten.tsv (sju, kök, tack …) welke uitspraakvariant MFA koos (tweede uitlijning,
+  alleen als zo'n woord in de tekst staat).
+"""
 import os
 import shutil
 import subprocess
 import time
 from pathlib import Path
 
-from analyse import analyseer_opname, f0_kenmerken, lees_varianten
-from proef_common import WERK, rij_voor_verzoek, serveer, woordenboek_extra, zinnen
-
-import numpy as np
+from gedeeld import DATA, normaliseer, rij_voor_verzoek, serveer, woordenboek_extra
+from uitlijning import keuze_uitspraak, lees_varianten, woordgrenzen
 
 WB = Path(os.environ["MFA_ROOT_DIR"]) / "pretrained_models" / "dictionary" / "swedish_mfa.dict"
-MAP = WERK / "web" / "mfa"
+MAP = DATA / "werk" / "mfa"            # werkmap (wordt bij elke opname overschreven)
 
 
 def met_extra(naam, basis, aanvulling=""):
@@ -64,25 +68,18 @@ def main():
     subprocess.run(["mfa", "server", "start"], capture_output=True)
     var = lees_varianten()
     wb_basis = WB.read_text(encoding="utf-8")
-    rijen_tsv = zinnen()
 
     def analyseer(v):
         t0 = time.perf_counter()
-        r = rij_voor_verzoek(v, rijen_tsv)
-        wb_s = met_extra("woordenboek_standaard.dict", wb_basis)
-        tg_s, methode = lijn_uit(v["wav"], r["zweeds"], wb_s, "standaard")
-        # Alleen woordtijden nodig (de voorbeeldstem van de productieversie): de variantuitlijning overslaan.
-        if v.get("alleen_tijden"):
-            _, woorden, _, _ = analyseer_opname("web", v.get("id", ""), r["deel"][0], v["wav"], tg_s, tg_s, var)
-            return {"woorden": [{"woord": w["woord"], "start": w["start"], "duur_ms": w["duur_ms"]} for w in woorden],
-                    "methode": methode, "sec": round(time.perf_counter() - t0, 1)}
-        tg_v, _ = lijn_uit(v["wav"], r["zweeds"], varianten_woordenboek(), "varianten")
-        keuze, woorden, klinkers, stem = analyseer_opname("web", v.get("id", ""), r["deel"][0], v["wav"],
-                                                          tg_s, tg_v, var)
-        ref = float(np.median(stem)) if len(stem) else None
-        woorden = [f0_kenmerken(w, ref) for w in woorden]
-        return {"keuze": keuze, "woorden": woorden, "klinkers": klinkers,
-                "methode": methode, "sec": round(time.perf_counter() - t0, 1)}
+        r = rij_voor_verzoek(v)
+        tg_s, methode = lijn_uit(v["wav"], r["zweeds"], met_extra("woordenboek_standaard.dict", wb_basis), "standaard")
+        uit = {"woorden": woordgrenzen(tg_s), "keuze": [], "methode": methode}
+        # De tweede uitlijning (met varianten) alleen als er een woord uit varianten.tsv in de tekst staat: op een
+        # trage server scheelt dat de helft van de tijd.
+        if not v.get("alleen_tijden") and set(normaliseer(r["zweeds"]).split()) & set(var):
+            tg_v, _ = lijn_uit(v["wav"], r["zweeds"], varianten_woordenboek(), "varianten")
+            uit["keuze"] = keuze_uitspraak(tg_v, var)
+        return dict(uit, sec=round(time.perf_counter() - t0, 1))
 
     serveer(analyseer, 8003)
 

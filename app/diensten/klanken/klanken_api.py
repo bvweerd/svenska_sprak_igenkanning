@@ -1,35 +1,28 @@
-"""Vraag 2 — hóé zeg je het? Een klankherkenner schrijft op welke klanken er gezegd zijn,
-zonder taalmodel dat de zin 'verbetert'. Vergelijking met de verwachte uitspraak uit het
-swedish_mfa-woordenboek (en ter informatie espeak-ng).
+"""Hóé zeg je het? Twee klankherkenners (wav2vec2) schrijven op welke klanken er gezegd zijn, zonder taalmodel dat
+de zin 'verbetert'; vergeleken met de verwachte uitspraak uit het swedish_mfa-woordenboek. Interne API.
 
-Beide kanten worden grof gemaakt (zonder lengte, toon, dentaal- en aspiratieteken), omdat de
-modellen elk een ander klankenstelsel hebben. Wat overblijft is genoeg voor sj/tj/k, u/y/oe.
-Let op: het espeak-model kent geen ɧ (sj-klank); het Zweedse model schrijft die als 'sx'.
+Beide kanten worden grof gemaakt (zonder lengte, toon, dentaal- en aspiratieteken), omdat de modellen elk een
+ander klankenstelsel hebben. Wat overblijft is genoeg voor sj/tj/k, u/y/oe. Het espeak-model kent geen ɧ
+(sj-klank); het Zweedse model schrijft die als 'sx'.
 
-  python klanken.py           alle opnames, beide modellen → resultaten/klanken.csv
-  python klanken.py --server  API voor de webpagina
+POST {"wav": pad, "id": stuk-id, "tekst": tekst} → {model: {herkend, verwacht, per, verschillen, per_woord}}
 """
 import os
 import re
-import subprocess
-import sys
 import time
 import unicodedata
-from pathlib import Path
 
 import soundfile as sf
 import torch
 from transformers import AutoProcessor, Wav2Vec2ForCTC
 
-from proef_common import (Cache, inhoud_hash, KLANK_PER_WOORD, KLANK_VARIANTEN, RESULTATEN, bewerkingen, leer_varianten, foutpercentage, normaliseer, opnames, ops_tekst,
-                          rij_voor_verzoek, schrijf_csv, serveer, woordenboek_extra, zin_voor, zinnen)
+from gedeeld import bewerkingen, foutpercentage, normaliseer, ops_tekst, rij_voor_verzoek, serveer, woordenboek_extra
 
 MODELLEN = {
     "xlsr53-espeak": "/modellen/wav2vec2-xlsr-53-espeak-cv-ft",
     "xlsr300m-sv": "/modellen/wav2vec2-xls-r-phoneme-300m-sv",
 }
 WOORDENBOEK = os.environ.get("WOORDENBOEK", "/modellen/swedish_mfa.dict")
-
 GELIJK = {"sx": "ɧ", "ʃ": "ɧ", "ʈ": "t", "ɖ": "d", "ɳ": "n", "ɭ": "l", "ʋ": "v", "ɐ": "a", "ə": "ɛ"}
 
 
@@ -54,10 +47,6 @@ def lees_woordenboek():
 def woord_klanken(tekst, wb):
     """Per woord de verwachte (grove) klanken: [(woord, [klank, ...]), ...]; leeg als het woord onbekend is."""
     return [(w, [g for g in (grof(k) for k in wb.get(w, [])) if g]) for w in normaliseer(tekst).split()]
-
-
-def verwacht_mfa(tekst, wb):
-    return [k for _, ks in woord_klanken(tekst, wb) for k in ks]
 
 
 def per_woord(woorden, ops):
@@ -117,12 +106,6 @@ def per_woord(woorden, ops):
     return uit
 
 
-def verwacht_espeak(tekst, stem="sv"):
-    uit = subprocess.run(["espeak-ng", "-v", stem, "-q", "--ipa", "--sep=_", tekst],
-                         capture_output=True, text=True, check=True).stdout
-    return " ".join(k for k in re.split(r"[_\s]+", uit) if k)
-
-
 def herken(model, processor, wav):
     audio, sr = sf.read(wav, dtype="float32")
     assert sr == 16000, f"{wav}: verwacht 16 kHz, kreeg {sr}"
@@ -130,94 +113,43 @@ def herken(model, processor, wav):
     with torch.inference_mode():
         logits = model(invoer.input_values).logits
     ids = torch.argmax(logits, dim=-1)[0].tolist()
-    # Zelf CTC-decoderen: herhalingen samenvoegen, lege tokens weg. Zo blijven klanken van
-    # meer tekens (eː, sx) heel, ook bij een tokenizer die alles aan elkaar plakt.
+    # Zelf CTC-decoderen: herhalingen samenvoegen, lege tokens weg. Zo blijven klanken van meer tekens (eː, sx)
+    # heel, ook bij een tokenizer die alles aan elkaar plakt.
     samen = [i for n, i in enumerate(ids) if n == 0 or i != ids[n - 1]]
     tokens = processor.tokenizer.convert_ids_to_tokens(samen)
     leeg = set(processor.tokenizer.all_special_tokens) | {"|", "<pad>", "<s>", "</s>", "<unk>"}
     return [t for t in tokens if t not in leeg]
 
 
-def laad_alle():
-    uit = {}
-    for naam, pad in MODELLEN.items():
-        uit[naam] = (Wav2Vec2ForCTC.from_pretrained(pad).eval(), AutoProcessor.from_pretrained(pad))
-    return uit
-
-
-def analyseer(naam, model, processor, wb, spreker, zin_id, wav, r):
+def analyseer(model, processor, wb, wav, r):
     t0 = time.perf_counter()
     ruw = herken(model, processor, str(wav))
-    sec = time.perf_counter() - t0
     herkend = [g for g in (grof(k) for k in ruw) if g]
     woorden = woord_klanken(r["zweeds"], wb)
     verwacht = [k for _, ks in woorden for k in ks]
     _, ops = bewerkingen(verwacht, herkend)
-    return {
-        "model": naam, "spreker": spreker, "id": zin_id, "deel": r["deel"][0],
-        "zin": r["zweeds"],
-        "verwacht": " ".join(verwacht), "herkend": " ".join(herkend),
-        "herkend_ruw": " ".join(ruw), "espeak": verwacht_espeak(r["zweeds"]),
-        "per": round(foutpercentage(verwacht, herkend), 3),
-        "verschillen": ops_tekst(ops), "sec": round(sec, 2),
-        "per_woord": per_woord(woorden, ops),
-    }
+    return {"verwacht": " ".join(verwacht), "herkend": " ".join(herkend), "herkend_ruw": " ".join(ruw),
+            "per": round(foutpercentage(verwacht, herkend), 3), "verschillen": ops_tekst(ops),
+            "per_woord": per_woord(woorden, ops), "sec": round(time.perf_counter() - t0, 2)}
 
 
 def main():
-    torch.set_num_threads(os.cpu_count() or 2)
-    wb = lees_woordenboek()
-    rijen_tsv = zinnen()
-    uit = []
-    cache = Cache("klanken", __file__)   # alleen nieuwe of gewijzigde opnames opnieuw analyseren
-    wb_hash = inhoud_hash(Path(WOORDENBOEK))
-    for naam, pad in MODELLEN.items():
-        geladen = None                    # model pas laden als er iets te doen is
-        for spreker, zin_id, wav in opnames():
-            r = zin_voor(spreker, zin_id, rijen_tsv)
-            sleutel = inhoud_hash(wav, r["zweeds"], naam, wb_hash)
-            rij = cache.get(sleutel)
-            if rij is None:
-                geladen = geladen or (Wav2Vec2ForCTC.from_pretrained(pad).eval(), AutoProcessor.from_pretrained(pad))
-                rij = analyseer(naam, *geladen, wb, spreker, zin_id, wav, r)
-                cache.put(sleutel, rij)
-                print(f"{naam:14} {spreker:6} {zin_id}  {rij['herkend']}   [{rij['verschillen']}]", flush=True)
-            uit.append(dict(rij, spreker=spreker, id=zin_id))
-    cache.bewaar()
-    # Per woord bewaren (voor controle achteraf) en uit de moedertaalsprekers leren welke afwijkingen van de
-    # woordenboek-uitspraak normaal zijn; de webpagina en het verslag gebruiken die bij het oordeel per woord.
-    import json
-    KLANK_PER_WOORD.write_text(json.dumps({f"{r['spreker']}|{r['id']}|{r['model']}": r["per_woord"] for r in uit},
-                                          ensure_ascii=False), encoding="utf-8")
-    varianten = leer_varianten((r["spreker"], r["model"], r["per_woord"]) for r in uit)
-    KLANK_VARIANTEN.write_text(json.dumps(varianten, ensure_ascii=False, indent=1), encoding="utf-8")
-    for m, v in varianten.items():
-        print(f"{m}: {len(v['anders'])} normale verwisselingen, {len(v['weg'])} weglatingen, "
-              f"{len(v['extra'])} extra klanken (uit {v['n_woorden']} woorden van moedertaalsprekers)")
-    # per_woord is voor de webpagina; in de CSV alleen de woorden met afwijkende klanken, leesbaar.
-    for rij in uit:
-        rij["woorden_afwijkend"] = " ".join(f"{w['woord']}:{w['score']}" for w in rij.pop("per_woord")
-                                            if w["score"] is not None and w["score"] < 1)
-    schrijf_csv(RESULTATEN / "klanken.csv", uit, list(uit[0]) if uit else ["model"])
-
-
-def server():
-    # KLANKEN_THREADS: zoveel kernen als de container krijgt (productie: een lichte server). Meer threads dan
-    # kernen maakt het juist trager (gemeten: 16 threads op 2 kernen, 62 s in plaats van ±15 s).
+    # KLANKEN_THREADS: zoveel kernen als de container krijgt. Meer threads dan kernen maakt het juist trager
+    # (gemeten: 16 threads op 2 kernen, 62 s in plaats van ±15 s).
     torch.set_num_threads(int(os.environ.get("KLANKEN_THREADS", 0)) or os.cpu_count() or 2)
     wb = lees_woordenboek()
-    rijen_tsv = zinnen()
-    modellen = laad_alle()
+    modellen = {naam: (Wav2Vec2ForCTC.from_pretrained(pad).eval(), AutoProcessor.from_pretrained(pad))
+                for naam, pad in MODELLEN.items()}
 
     def analyseer_verzoek(v):
         # Woorden die niet in het woordenboek staan (namen in de teksten): uit MFA's G2P (app/woordenboek).
         for woord, uitspraak in woordenboek_extra():
             wb.setdefault(woord, uitspraak.split())
-        r = rij_voor_verzoek(v, rijen_tsv)
-        return {naam: analyseer(naam, m, p, wb, "web", v.get("id", ""), v["wav"], r) for naam, (m, p) in modellen.items()}
+        r = rij_voor_verzoek(v)
+        return {naam: analyseer(m, p, wb, v["wav"], r) for naam, (m, p) in modellen.items()}
 
     serveer(analyseer_verzoek, 8002)
 
 
 if __name__ == "__main__":
-    server() if "--server" in sys.argv else main()
+    main()

@@ -11,6 +11,9 @@ MFA's G2P-model (`app/woordenboek`). Lokaal getest: import (232 teksten, 2334 st
 (±16–18 s op de laptop), mp4-opname via Caddy, twee gebruikers, herstel na een herstart. Niet getest: op de mini-pc
 zelf en met een echte telefoon.
 
+Daarna opgeruimd: de proef is uit de repo (git-tag `proef`); alles wat de trainer gebruikt staat in `app/`
+(`common/`, `diensten/`), de oefenteksten in `app/teksten/` (in git), het verslag van de proef in `ONDERZOEK.md`.
+
 ## 1. Wat blijft en wat eruit gaat
 
 **Blijft** (bewezen in de proef):

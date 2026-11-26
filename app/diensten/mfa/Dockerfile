@@ -10,7 +10,7 @@ ENV PATH=/env/bin:$PATH \
 RUN (userdel -r "$(getent passwd 1000 | cut -d: -f1)" 2>/dev/null || true) \
     && useradd -m -u 1000 mfa && mkdir -p /mfa /app && chown mfa:mfa /mfa /app
 USER mfa
-# Modellen bij het bouwen ophalen: daarna werkt de proef offline. Rechtstreeks uit de GitHub-releases
+# Modellen bij het bouwen ophalen: daarna werkt alles offline. Rechtstreeks uit de GitHub-releases
 # (niet via 'mfa model download': die gebruikt de GitHub-API, die anoniem maar 60 verzoeken per uur toestaat).
 ARG MFA_MODELS=https://github.com/MontrealCorpusTools/mfa-models/releases/download
 ADD --chown=mfa:mfa ${MFA_MODELS}/acoustic-swedish_mfa-v2.0.0a/swedish_mfa.zip /mfa/pretrained_models/acoustic/
@@ -21,6 +21,7 @@ COPY common/extra_uitspraak.dict /tmp/
 RUN cat /tmp/extra_uitspraak.dict >> /mfa/pretrained_models/dictionary/swedish_mfa.dict \
     && mfa model inspect acoustic swedish_mfa > /dev/null && mfa server init
 WORKDIR /app
-# api.py (webpagina) gebruikt dezelfde analyse als de batchstap 'prosodie'.
-COPY --chown=mfa:mfa mfa/align.sh mfa/incrementeel.py mfa/varianten.tsv mfa/api.py common/proef_common.py prosodie/analyse.py ./
-CMD ["bash", "align.sh"]
+# mfa_api.py: uitlijning per opname (interne API); woordenboek.py: uitspraak van namen e.d. (bij bijwerken).
+COPY --chown=mfa:mfa diensten/mfa/varianten.tsv diensten/mfa/mfa_api.py diensten/mfa/uitlijning.py common/gedeeld.py ./
+COPY --chown=mfa:mfa woordenboek/maak.py ./woordenboek.py
+CMD ["python", "mfa_api.py"]

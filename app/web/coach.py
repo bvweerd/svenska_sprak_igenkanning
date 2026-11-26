@@ -1,5 +1,5 @@
-"""Gebruikersvriendelijke feedback (productieversie). Overgenomen uit de proef (proef/web/coach.py), met wat
-daar betrouwbaar bleek (zie de README):
+"""Gebruikersvriendelijke feedback (productieversie). Overgenomen uit de proef (git-tag 'proef'), met wat daar
+betrouwbaar bleek (zie ONDERZOEK.md):
 - het oordeel komt uit de score op het hele stuk, in woorden;
 - een paar tips, op volgorde van betrouwbaarheid: wat Whisper anders verstond (alleen als een klankherkenner
   het bevestigt), een fout bij een doelwoord volgens MFA, en pas dan een klanktip;
@@ -11,7 +11,7 @@ komen uit data/voorbeeld/<stuk>.json (gemaakt door de voorbeeldtaak).
 """
 from collections import Counter, defaultdict
 
-from proef_common import (KLANK_MODELLEN, SCORE_KLANKEN, bewerkingen, doel_variant, klank, klank_oordeel,
+from gedeeld import (KLANK_MODELLEN, SCORE_KLANKEN, bewerkingen, doel_variant, klank, klank_oordeel,
                           lees_ijking, lees_klank_varianten, normaliseer, ruwe_score, score_onderdelen, vergelijk)
 
 
@@ -197,7 +197,7 @@ def woordtijden(r, res, voorbeeld):
     weergave, naar = _weergave(r)
     verwacht = normaliseer(r["zweeds"]).split()
     eigen = [(w["start"], w["start"] + w["duur_ms"] / 1000, w["woord"])
-             for w in res.get("mfa", {}).get("woorden", []) if w.get("woord")]
+             for w in res.get("mfa", {}).get("woorden", []) if w.get("woord") not in (None, "", "<eps>", "<unk>")]
     uit = [{"eigen": None, "voorbeeld": None} for _ in weergave]
     for soort, lijst in (("eigen", eigen), ("voorbeeld", voorbeeld or [])):
         for k, t in enumerate(_tijden(verwacht, lijst) if lijst else []):
@@ -252,7 +252,7 @@ def kies_tips(stuk_id, r, res, toelichting, patronen=(), max_tips=None):
 
     # 2. MFA: bij een doelwoord de verkeerde uitspraakvariant (bv. harde sk, lange a).
     for k in res.get("mfa", {}).get("keuze", []):
-        doel = doel_variant(stuk_id, k["woord"])
+        doel = doel_variant(k["woord"])
         if k["gekozen"] != doel and k["woord"] in verwacht:
             tips.append({"titel": f"Uitspraak van „{k['woord']}”",
                          "uitleg": f"Klonk als {toelichting.get((k['woord'], k['gekozen']), k['gekozen'])}; "
@@ -326,5 +326,5 @@ def score_van(stuk_id, res):
     ijking = lees_ijking()
     ond = score_onderdelen(wh if "fout" not in wh else None,
                            {m: kl.get(m) for m in KLANK_MODELLEN if isinstance(kl.get(m), dict)},
-                           mfa.get("keuze"), stuk_id, native_per=(ijking or {}).get("native_per"))
+                           mfa.get("keuze"), native_per=(ijking or {}).get("native_per"))
     return {**vergelijk(ruwe_score(ond), ijking), "onderdelen": {n: round(100 * v) for n, v in ond.items()}}

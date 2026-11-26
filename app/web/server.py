@@ -19,10 +19,10 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from coach import eindoordeel, kies_tips, niets_gehoord, patronen, score_van, woordtijden, zet_namen
-from proef_common import (SCORE_KLANKEN, bewerkingen, doel_variant, klank_oordeel, lees_klank_varianten,
+from gedeeld import (SCORE_KLANKEN, bewerkingen, doel_variant, klank_oordeel, lees_klank_varianten,
                           normaliseer, zet_om)
 
-DATA = Path(os.environ.get("PROEF_DATA", "/data"))
+DATA = Path(os.environ.get("DATA", "/data"))
 TEKSTEN = Path(os.environ.get("TEKSTEN", "/teksten/teksten.json"))
 OPNAMES = DATA / "opnames"
 VOORBEELD = DATA / "voorbeeld"
@@ -223,7 +223,7 @@ def woord_oordeel(stuk_id, r, res):
             if tekst:
                 (info[i]["fouten"] if status == "fout" else info[i]["let_op"]).append(tekst)
     for k in res.get("mfa", {}).get("keuze", []):
-        doel = doel_variant(stuk_id, k["woord"])
+        doel = doel_variant(k["woord"])
         if k["gekozen"] != doel and k["woord"] in verwacht:
             i = verwacht.index(k["woord"])
             uitleg = TOELICHTING.get((k["woord"], k["gekozen"]), k["gekozen"])

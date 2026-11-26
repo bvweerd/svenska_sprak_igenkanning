@@ -1,6 +1,6 @@
 """Voorbeeldstem voor alle oefenstukken: een achtergrondtaak die de processor niet overbelast.
 
-Per stuk: MMS-TTS Zweeds (met pauzes bij leestekens, zoals in de proef: proef/klanken/voorbeeldstem.py) →
+Per stuk: MMS-TTS Zweeds (met pauzes bij leestekens: diensten/klanken/voorbeeldstem.py) →
 data/voorbeeld/<stuk>.wav, daarna de woordtijden via de MFA-API → data/voorbeeld/<stuk>.json.
 - 1 thread, laagste prioriteit (nice 19), en een container met 1 kern (docker-compose.yml);
 - wacht zolang er een opname geanalyseerd wordt of in de wachtrij staat (de gebruikers gaan voor);
@@ -20,7 +20,7 @@ from transformers import AutoTokenizer, VitsModel
 
 from voorbeeldstem import MODEL, STEM, spreek
 
-DATA = Path(os.environ.get("PROEF_DATA", "/data"))
+DATA = Path(os.environ.get("DATA", "/data"))
 TEKSTEN = Path(os.environ.get("TEKSTEN", "/teksten/teksten.json"))
 UIT = DATA / "voorbeeld"
 WEB = os.environ.get("WEB", "http://web:8080")

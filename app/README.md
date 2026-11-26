@@ -4,7 +4,7 @@ Thuis, voor twee gebruikers, op een lichte server (getest ontwerp voor een mini-
 geen AVX2, geen GPU). Je leest teksten van de A-site (A1–A2) en de B-site (B1–B2) voor, neemt op in de browser
 (laptop, tablet of telefoon) en krijgt een oordeel, tips en „Luister en vergelijk” met een Zweedse voorbeeldstem.
 Het plan en de keuzes staan in [`../PLAN_PRODUCTIE.md`](../PLAN_PRODUCTIE.md); hoe de analyse werkt en waarom,
-in de README van de proef ([`../README.md`](../README.md)).
+in [`../ONDERZOEK.md`](../ONDERZOEK.md).
 
 ## Onderdelen
 
@@ -22,6 +22,10 @@ in de README van de proef ([`../README.md`](../README.md)).
 De drie analyses lopen **na elkaar** (niet tegelijk), met hoogstens `ANALYSE_KERNEN` threads; zo blijft er een kern
 vrij voor de rest van de server. De voorbeeldtaak wacht zolang er een opname in de wachtrij staat. De ijking van de
 score (moedertaalsprekers = 100, Nederlands accent = 0) is uit de proef overgenomen en bevroren in `ijking/`.
+
+De code: `web/` (pagina en server), `common/gedeeld.py` (score, oordeel per woord, audio), `diensten/` (de drie
+modelservices), `voorbeeld/` (voorbeeldstem), `importeer/` en `woordenboek/` (bijwerken), `teksten/` (de
+oefenteksten), `ijking/`, `caddy/`.
 
 ## Installeren
 
@@ -88,6 +92,6 @@ vanzelf weer in de wachtrij.
 ## Bekende beperkingen
 
 - De voorbeeldstem (MMS) zegt sommige leenwoorden, afkortingen en namen verkeerd (*chef*, *tv*, *sms*) en een vraag
-  klinkt als een mededeling; zie de README van de proef. Getallen staan in de teksten als woorden.
+  klinkt als een mededeling; zie ONDERZOEK.md. Getallen staan in de teksten als woorden.
 - Een opname van Safari (iPhone/iPad) is mp4; die wordt met ffmpeg omgezet. Nog niet op een echt toestel getest.
 - Licenties: MMS-TTS (CC BY-NC 4.0) en de teksten (CC BY-NC-SA 4.0) alleen niet-commercieel — thuisgebruik.

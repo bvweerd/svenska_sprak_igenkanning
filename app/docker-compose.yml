@@ -6,7 +6,7 @@
 #   docker compose --profile bijwerken run --rm woordenboek    # uitspraak van namen e.d. (MFA-G2P)
 #   docker compose up -d                                       # trainer + voorbeeldstem op de achtergrond
 #
-# De analysemodellen zijn dezelfde images als in de proef (proef/…). Alles draait als uid 1000; data/ moet
+# Alles wordt gebouwd vanuit deze map (app/). Alles draait als uid 1000; data/ moet
 # voor die gebruiker schrijfbaar zijn. CPU- en geheugengrenzen houden de rest van de server (Home Assistant)
 # bruikbaar: één analyse tegelijk, de drie modellen na elkaar, de voorbeeldstem op 1 kern met lage prioriteit.
 
@@ -36,19 +36,17 @@ services:
 
   web:
     <<: *altijd
-    build: { context: .., dockerfile: app/web/Dockerfile }
+    build: { context: ., dockerfile: web/Dockerfile }
     image: uitspraak/web
     environment:
       <<: *teksten-env
       GEBRUIKERS: ${GEBRUIKERS:-Gebruiker 1,Gebruiker 2}
-      IJKING: /ijking/score_ijking.json
-      KLANK_VARIANTEN: /ijking/klank_varianten.json
     ports: ["127.0.0.1:${WEB_POORT:-8090}:8080"]     # alleen op de server zelf (zonder microfoon: alleen kijken)
     volumes:
       - ./data:/data
       - ./teksten:/teksten:ro
       - ./data/caddy:/caddy:ro                       # rootcertificaat voor /certificaat
-      # Bevroren ijking uit de proef (moedertaalsprekers = 100, Nederlands accent = 0).
+      # Bevroren ijking uit de proef (moedertaalsprekers = 100, Nederlands accent = 0); zie ONDERZOEK.md.
       - ./ijking:/ijking:ro
     cpus: 1
     mem_limit: 512m
@@ -56,12 +54,8 @@ services:
 
   whisper-api:
     <<: *altijd
-    build:
-      context: ../proef
-      dockerfile: whisper/Dockerfile
-      args: { WHISPER_MODELLEN: "small" }
-    image: proef-sv/whisper
-    command: ["python", "transcribe.py", "--server"]
+    build: { context: ., dockerfile: diensten/whisper/Dockerfile }
+    image: uitspraak/whisper
     environment:
       <<: *teksten-env
       WHISPER_API_MODEL: small
@@ -72,9 +66,8 @@ services:
 
   klanken-api:
     <<: *altijd
-    build: { context: ../proef, dockerfile: klanken/Dockerfile }
-    image: proef-sv/klanken
-    command: ["python", "klanken.py", "--server"]
+    build: { context: ., dockerfile: diensten/klanken/Dockerfile }
+    image: uitspraak/klanken
     environment:
       <<: *teksten-env
       KLANKEN_THREADS: ${ANALYSE_KERNEN:-3}
@@ -86,9 +79,8 @@ services:
 
   mfa-api:
     <<: *altijd
-    build: { context: ../proef, dockerfile: mfa/Dockerfile }
-    image: proef-sv/mfa
-    command: ["python", "api.py"]
+    build: { context: ., dockerfile: diensten/mfa/Dockerfile }
+    image: uitspraak/mfa
     environment: *teksten-env
     shm_size: "1gb"
     volumes: [./data:/data, ./teksten:/teksten:ro]
@@ -97,8 +89,8 @@ services:
 
   voorbeeld:                        # voorbeeldstem (MMS) voor alle stukken, op de achtergrond
     <<: *altijd
-    image: proef-sv/klanken
-    command: ["python", "/app/maak.py"]
+    image: uitspraak/klanken           # zelfde image als klanken-api
+    command: ["python", "maak.py"]
     environment:
       <<: *teksten-env
       # PyTorch bewaart per invoerlengte een gecompileerde kernel (oneDNN); elk stuk heeft een andere lengte, dus
@@ -110,7 +102,6 @@ services:
     volumes:
       - ./data:/data
       - ./teksten:/teksten:ro
-      - ./voorbeeld/maak.py:/app/maak.py:ro
     cpus: 1
     mem_limit: 1500m
     depends_on: [klanken-api, mfa-api, web]
@@ -127,12 +118,11 @@ services:
     profiles: [bijwerken]
 
   woordenboek:
-    image: proef-sv/mfa
+    image: uitspraak/mfa
     user: "1000:1000"
-    command: ["python", "/app/woordenboek.py"]
+    command: ["python", "woordenboek.py"]
     environment: *teksten-env
     shm_size: "1gb"
     volumes:
       - ./teksten:/teksten
-      - ./woordenboek/maak.py:/app/woordenboek.py:ro
     profiles: [bijwerken]

@@ -10,9 +10,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from proef_common import normaliseer
+from gedeeld import normaliseer
 
-DATA = Path(os.environ.get("PROEF_DATA", "/data"))
 WB = Path(os.environ["MFA_ROOT_DIR"]) / "pretrained_models" / "dictionary" / "swedish_mfa.dict"
 TEKSTEN = Path(os.environ.get("TEKSTEN", "/teksten/teksten.json"))
 UIT = Path(os.environ.get("WOORDENBOEK_EXTRA", "/teksten/woordenboek_extra.dict"))
@@ -31,7 +30,8 @@ def main():
         lijst, uit = Path(tmp) / "woorden.txt", Path(tmp) / "uitspraak.txt"
         lijst.write_text("\n".join(nieuw) + "\n", encoding="utf-8")
         subprocess.run(["mfa", "g2p", str(lijst), "swedish_mfa", str(uit), "--clean"], check=True)
-        regels = [r for r in uit.read_text(encoding="utf-8").splitlines() if "\t" in r]
+        # Gesorteerd: MFA schrijft in wisselende volgorde, en het bestand staat in git.
+        regels = sorted({r for r in uit.read_text(encoding="utf-8").splitlines() if "\t" in r})
     UIT.write_text("\n".join(regels) + "\n", encoding="utf-8")
     print(f"→ {UIT} ({len(regels)} woorden), bv.: " + "; ".join(regels[:5]))
 
