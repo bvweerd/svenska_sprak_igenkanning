@@ -3,7 +3,7 @@
 FROM condaforge/miniforge3:latest
 RUN conda create -y -p /env -c conda-forge montreal-forced-aligner=3.4.4 python=3.11 postgresql \
     && conda clean -afy \
-    && /env/bin/pip install --no-cache-dir praat-parselmouth==0.4.5 praatio==6.2.0
+    && /env/bin/pip install --no-cache-dir praatio==6.2.0
 ENV PATH=/env/bin:$PATH \
     MFA_ROOT_DIR=/mfa
 # Het basisimage heeft al een gebruiker met uid 1000 (ubuntu): die eerst weghalen.

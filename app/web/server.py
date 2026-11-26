@@ -137,10 +137,11 @@ def lees_index(gebruiker):
         return {}
 
 
-def zet_in_index(gebruiker, naam, waarden):
+def zet_in_index(gebruiker, naam, waarden, vervang=False):
+    """Werkt het oordeel van een opname in index.json bij; vervang=True gooit de oude velden weg."""
     with _index_lock:
         idx = lees_index(gebruiker)
-        idx[naam] = dict(idx.get(naam, {}), **waarden)
+        idx[naam] = dict(waarden) if vervang else dict(idx.get(naam, {}), **waarden)
         pad = map_van(gebruiker) / "index.json"
         tmp = pad.with_suffix(".tmp")
         tmp.write_text(json.dumps(idx, ensure_ascii=False), encoding="utf-8")
@@ -160,7 +161,8 @@ def recente_analyses(gebruiker):
         if idx[naam].get("klaar"):
             laatste[idx[naam]["stuk"]] = naam
     uit = []
-    for naam in sorted(laatste.values())[-PATROON_STUKKEN:]:
+    # Op tijd (het deel na '__'), niet op naam: anders tellen de alfabetisch laatste stukken in plaats van de recente.
+    for naam in sorted(laatste.values(), key=lambda n: n.split("__")[1])[-PATROON_STUKKEN:]:
         try:
             uit.append(json.loads((map_van(gebruiker) / f"{naam}.json").read_text(encoding="utf-8"))["resultaten"])
         except (OSError, ValueError, KeyError):
@@ -332,11 +334,13 @@ class Wachtrij:
                     self.bezig = None
 
     def herstel(self):
+        """Opnames zonder analyse (bv. de server werd herstart) weer in de rij; niet de mislukte: die blijven
+        mislukt tot iemand op 'Opnieuw analyseren' drukt (anders lopen ze bij elke herstart opnieuw)."""
         for g in GEBRUIKERS:
-            m = map_van(g)
+            m, idx = map_van(g), lees_index(g)
             for meta in sorted(m.glob("*.meta.json")):
                 naam = meta.name[:-len(".meta.json")]
-                if not (m / f"{naam}.json").exists():
+                if not (m / f"{naam}.json").exists() and not idx.get(naam, {}).get("fout"):
                     self.zet(g, naam)
 
 
@@ -466,6 +470,9 @@ class Handler(BaseHTTPRequestHandler):
             if not (map_van(g) / f"{naam}.meta.json").exists():
                 return self._stuur(404, {"fout": "onbekende opname"})
             (map_van(g) / f"{naam}.json").unlink(missing_ok=True)
+            # Het oude oordeel (of de oude fout) weg: tot de nieuwe analyse klaar is, geldt de opname als bezig.
+            meta = json.loads((map_van(g) / f"{naam}.meta.json").read_text(encoding="utf-8"))
+            zet_in_index(g, naam, {"stuk": meta["stuk"], "klaar": False, "tijd": tijd_van(naam)}, vervang=True)
             WACHTRIJ.zet(g, naam)
             return self._stuur(200, {"naam": naam, "status": "wachtrij", "plek": WACHTRIJ.plek(g, naam)})
         if url.path != "/api/opname":
@@ -488,6 +495,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             geluid = zet_om(bron, m / f"{naam}-16k.wav")   # 16 kHz mono; plof en brom eruit (ook mp4 van Safari)
         except Exception as e:  # noqa: BLE001
+            bron.unlink(missing_ok=True)
+            (m / f"{naam}-16k.wav").unlink(missing_ok=True)
             return self._stuur(400, {"fout": f"kon de opname niet omzetten ({ext}): {e}"})
         (m / f"{naam}.meta.json").write_text(json.dumps(
             {"stuk": stuk["id"], "tekst": stuk["tekst"], "microfoon": microfoon, "geluid": geluid},

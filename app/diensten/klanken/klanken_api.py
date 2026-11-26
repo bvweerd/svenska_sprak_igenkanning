@@ -137,14 +137,17 @@ def main():
     # KLANKEN_THREADS: zoveel kernen als de container krijgt. Meer threads dan kernen maakt het juist trager
     # (gemeten: 16 threads op 2 kernen, 62 s in plaats van ±15 s).
     torch.set_num_threads(int(os.environ.get("KLANKEN_THREADS", 0)) or os.cpu_count() or 2)
-    wb = lees_woordenboek()
+    basis = lees_woordenboek()
     modellen = {naam: (Wav2Vec2ForCTC.from_pretrained(pad).eval(), AutoProcessor.from_pretrained(pad))
                 for naam, pad in MODELLEN.items()}
 
     def analyseer_verzoek(v):
-        # Woorden die niet in het woordenboek staan (namen in de teksten): uit MFA's G2P (app/woordenboek).
+        # Woorden die niet in het woordenboek staan (namen in de teksten): uit MFA's G2P (app/woordenboek). Per
+        # verzoek opnieuw, zodat een bijgewerkt bestand meteen telt (net als bij MFA); het woordenboek gaat voor.
+        extra = {}
         for woord, uitspraak in woordenboek_extra():
-            wb.setdefault(woord, uitspraak.split())
+            extra.setdefault(woord, uitspraak.split())
+        wb = {**extra, **basis}
         r = rij_voor_verzoek(v)
         return {naam: analyseer(m, p, wb, v["wav"], r) for naam, (m, p) in modellen.items()}
 

@@ -89,7 +89,8 @@ services:
 
   voorbeeld:                        # voorbeeldstem (MMS) voor alle stukken, op de achtergrond
     <<: *altijd
-    image: uitspraak/klanken           # zelfde image als klanken-api
+    build: { context: ., dockerfile: diensten/klanken/Dockerfile }   # zelfde image als klanken-api
+    image: uitspraak/klanken
     command: ["python", "maak.py"]
     environment:
       <<: *teksten-env
@@ -118,6 +119,7 @@ services:
     profiles: [bijwerken]
 
   woordenboek:
+    build: { context: ., dockerfile: diensten/mfa/Dockerfile }       # zelfde image als mfa-api
     image: uitspraak/mfa
     user: "1000:1000"
     command: ["python", "woordenboek.py"]
