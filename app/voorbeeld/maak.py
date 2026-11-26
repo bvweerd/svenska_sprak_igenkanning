@@ -21,7 +21,7 @@ from transformers import AutoTokenizer, VitsModel
 from voorbeeldstem import MODEL, STEM, spreek
 
 DATA = Path(os.environ.get("PROEF_DATA", "/data"))
-TEKSTEN = DATA / "teksten.json"
+TEKSTEN = Path(os.environ.get("TEKSTEN", "/teksten/teksten.json"))
 UIT = DATA / "voorbeeld"
 WEB = os.environ.get("WEB", "http://web:8080")
 MFA = os.environ.get("MFA_API", "http://mfa-api:8003")
@@ -40,7 +40,11 @@ def lees(pad):
 
 
 def te_doen():
-    d = lees(TEKSTEN) or {"teksten": []}
+    d = lees(TEKSTEN)
+    if not d or not d.get("teksten"):
+        # Geen (leesbare) teksten: niets doen en zeker niets opruimen (anders gaan alle voorbeelden weg).
+        log(f"geen teksten in {TEKSTEN}; even wachten")
+        return [], 0
     volgorde = sorted(d["teksten"], key=lambda t: (t["soort"] == "woordenschat", t["site"], t["hoofdstuk"]))
     stukken = [s for t in volgorde for s in t["stukken"]]
     ids = {s["id"] for s in stukken}

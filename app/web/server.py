@@ -1,6 +1,6 @@
 """Uitspraaktrainer Zweeds (productieversie): oefenstukken van de A- en B-site voorlezen, opnemen en feedback.
 
-- Teksten: data/teksten.json (app/importeer).
+- Teksten: app/teksten/teksten.json (in git; gemaakt door app/importeer), in de container /teksten.
 - Voorbeeldstem: data/voorbeeld/<stuk>.wav + .json met woordtijden (app/voorbeeld, een achtergrondtaak).
 - Opnames per gebruiker: data/opnames/<gebruiker>/<stuk>__<stempel>.{webm|m4a|…} (origineel), -16k.wav
   (schoongemaakt), .meta.json (tekst, microfoon) en .json (analyse); index.json houdt per opname het oordeel bij.
@@ -23,7 +23,7 @@ from proef_common import (SCORE_KLANKEN, bewerkingen, doel_variant, klank_oordee
                           normaliseer, zet_om)
 
 DATA = Path(os.environ.get("PROEF_DATA", "/data"))
-TEKSTEN = DATA / "teksten.json"
+TEKSTEN = Path(os.environ.get("TEKSTEN", "/teksten/teksten.json"))
 OPNAMES = DATA / "opnames"
 VOORBEELD = DATA / "voorbeeld"
 CADDY_ROOT = Path(os.environ.get("CADDY_ROOT", "/caddy/caddy/pki/authorities/local/root.crt"))

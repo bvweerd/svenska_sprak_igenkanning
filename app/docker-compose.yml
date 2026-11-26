@@ -14,6 +14,11 @@ x-altijd: &altijd
   restart: unless-stopped
   user: "1000:1000"
 
+# De oefenteksten en de uitspraak van namen e.d. staan in git (app/teksten/); de import werkt ze bij.
+x-teksten-env: &teksten-env
+  TEKSTEN: /teksten/teksten.json
+  WOORDENBOEK_EXTRA: /teksten/woordenboek_extra.dict
+
 services:
   caddy:
     image: caddy:2.8.4-alpine
@@ -34,12 +39,14 @@ services:
     build: { context: .., dockerfile: app/web/Dockerfile }
     image: uitspraak/web
     environment:
+      <<: *teksten-env
       GEBRUIKERS: ${GEBRUIKERS:-Gebruiker 1,Gebruiker 2}
       IJKING: /ijking/score_ijking.json
       KLANK_VARIANTEN: /ijking/klank_varianten.json
     ports: ["127.0.0.1:${WEB_POORT:-8090}:8080"]     # alleen op de server zelf (zonder microfoon: alleen kijken)
     volumes:
       - ./data:/data
+      - ./teksten:/teksten:ro
       - ./data/caddy:/caddy:ro                       # rootcertificaat voor /certificaat
       # Bevroren ijking uit de proef (moedertaalsprekers = 100, Nederlands accent = 0).
       - ./ijking:/ijking:ro
@@ -56,9 +63,10 @@ services:
     image: proef-sv/whisper
     command: ["python", "transcribe.py", "--server"]
     environment:
+      <<: *teksten-env
       WHISPER_API_MODEL: small
       WHISPER_THREADS: ${ANALYSE_KERNEN:-3}
-    volumes: [./data:/data]
+    volumes: [./data:/data, ./teksten:/teksten:ro]
     cpus: ${ANALYSE_KERNEN:-3}
     mem_limit: 1500m
 
@@ -68,10 +76,11 @@ services:
     image: proef-sv/klanken
     command: ["python", "klanken.py", "--server"]
     environment:
+      <<: *teksten-env
       KLANKEN_THREADS: ${ANALYSE_KERNEN:-3}
       ONEDNN_PRIMITIVE_CACHE_CAPACITY: "8"   # elke opname heeft een andere lengte: kernelcache begrenzen
       LRU_CACHE_CAPACITY: "8"
-    volumes: [./data:/data]
+    volumes: [./data:/data, ./teksten:/teksten:ro]
     cpus: ${ANALYSE_KERNEN:-3}
     mem_limit: 3g
 
@@ -80,8 +89,9 @@ services:
     build: { context: ../proef, dockerfile: mfa/Dockerfile }
     image: proef-sv/mfa
     command: ["python", "api.py"]
+    environment: *teksten-env
     shm_size: "1gb"
-    volumes: [./data:/data]
+    volumes: [./data:/data, ./teksten:/teksten:ro]
     cpus: ${ANALYSE_KERNEN:-3}
     mem_limit: 2g
 
@@ -90,6 +100,7 @@ services:
     image: proef-sv/klanken
     command: ["python", "/app/maak.py"]
     environment:
+      <<: *teksten-env
       # PyTorch bewaart per invoerlengte een gecompileerde kernel (oneDNN); elk stuk heeft een andere lengte, dus
       # zonder grens groeit het geheugen ±150 MB per stuk.
       ONEDNN_PRIMITIVE_CACHE_CAPACITY: "8"
@@ -98,6 +109,7 @@ services:
       OPNIEUW_NA: "100"              # na zoveel stukken herstart de taak zichzelf (geheugen vrij)
     volumes:
       - ./data:/data
+      - ./teksten:/teksten:ro
       - ./voorbeeld/maak.py:/app/maak.py:ro
     cpus: 1
     mem_limit: 1500m
@@ -111,15 +123,16 @@ services:
     volumes:
       - ${BRON_A:-../../svenska_ovningar}:/bron/a:ro
       - ${BRON_B:-../../svenska_ovningar_b}:/bron/b:ro
-      - ./data:/data
+      - ./teksten:/teksten
     profiles: [bijwerken]
 
   woordenboek:
     image: proef-sv/mfa
     user: "1000:1000"
     command: ["python", "/app/woordenboek.py"]
+    environment: *teksten-env
     shm_size: "1gb"
     volumes:
-      - ./data:/data
+      - ./teksten:/teksten
       - ./woordenboek/maak.py:/app/woordenboek.py:ro
     profiles: [bijwerken]

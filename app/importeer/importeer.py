@@ -1,4 +1,4 @@
-"""Teksten van de A-site (svenska_ovningar, A1–A2) en de B-site (svenska_ovningar_b, B1–B2) → /data/teksten.json.
+"""Teksten van de A-site (svenska_ovningar, A1–A2) en de B-site (svenska_ovningar_b, B1–B2) → app/teksten/teksten.json (in git).
 
 De sites zelf worden alleen gelezen (content/chapters/*.yaml en content/index.yaml). Per hoofdstuk:
   - de leestekst, de makkelijke leesteksten en de luistertekst (oefeningen met 'text');
@@ -24,7 +24,7 @@ import yaml
 from num2words import num2words
 
 BRONNEN = {"A": Path(os.environ.get("BRON_A", "/bron/a")), "B": Path(os.environ.get("BRON_B", "/bron/b"))}
-UIT = Path(os.environ.get("TEKSTEN", "/data/teksten.json"))
+UIT = Path(os.environ.get("TEKSTEN", "/teksten/teksten.json"))
 STUK_MAX = 320        # tekens per oefenstuk (±2–4 zinnen)
 ALINEA_MAX = 420      # een alinea tot zo lang blijft heel
 KLEIN = 70            # een kleiner laatste stuk gaat bij het vorige

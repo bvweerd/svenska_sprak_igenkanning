@@ -16,8 +16,8 @@ in de README van de proef ([`../README.md`](../README.md)).
 | `klanken-api` | welke klanken? (twee wav2vec2-klankherkenners) | `ANALYSE_KERNEN`, 3 GB |
 | `mfa-api` | woordgrenzen en uitspraakvariant (Montreal Forced Aligner) | `ANALYSE_KERNEN`, 2 GB |
 | `voorbeeld` | voorbeeldstem (MMS-TTS) voor alle stukken, op de achtergrond | 1 kern, nice 19, 1,5 GB |
-| `importeer` | teksten van de sites → `data/teksten.json` (alleen bij bijwerken) | |
-| `woordenboek` | uitspraak van namen e.d. met MFA's G2P (alleen bij bijwerken) | |
+| `importeer` | teksten van de sites → `teksten/teksten.json` (alleen bij bijwerken) | |
+| `woordenboek` | uitspraak van namen e.d. met MFA's G2P → `teksten/woordenboek_extra.dict` (alleen bij bijwerken) | |
 
 De drie analyses lopen **na elkaar** (niet tegelijk), met hoogstens `ANALYSE_KERNEN` threads; zo blijft er een kern
 vrij voor de rest van de server. De voorbeeldtaak wacht zolang er een opname in de wachtrij staat. De ijking van de
@@ -25,18 +25,15 @@ score (moedertaalsprekers = 100, Nederlands accent = 0) is uit de proef overgeno
 
 ## Installeren
 
-Op de server (Linux met Docker en de compose-plugin), naast elkaar:
+De oefenteksten staan al in git (`teksten/`), dus op de server (Linux met Docker en de compose-plugin) is alleen
+deze repo nodig:
 
 ```bash
-git clone <deze repo> svenska_sprak_igenkanning      # branch dev
-git clone <A-site> svenska_ovningar
-git clone <B-site> svenska_ovningar_b
+git clone -b dev <deze repo> svenska_sprak_igenkanning
 cd svenska_sprak_igenkanning/app
 cp .env.voorbeeld .env        # gebruikers, adres van de server, poort
 mkdir -p data/caddy data/caddy-config && sudo chown -R 1000:1000 data   # alles draait als uid 1000
 docker compose build          # eenmalig ±20–40 min; downloadt de modellen (±10 GB aan images)
-docker compose --profile bijwerken run --rm importeer
-docker compose --profile bijwerken run --rm woordenboek
 docker compose up -d
 ```
 
@@ -51,15 +48,16 @@ Daarna op elk apparaat:
 
 ## Bijwerken
 
-Nieuwe of gewijzigde teksten op de sites:
+Nieuwe of gewijzigde teksten op de sites: draai de import waar de A- en B-site naast deze repo staan (bv. op je
+laptop; paden in `.env`: `BRON_A`, `BRON_B`), en commit het resultaat:
 
 ```bash
-(cd ../../svenska_ovningar && git pull) && (cd ../../svenska_ovningar_b && git pull)
-docker compose --profile bijwerken run --rm importeer
-docker compose --profile bijwerken run --rm woordenboek
+docker compose --profile bijwerken run --rm importeer      # → teksten/teksten.json
+docker compose --profile bijwerken run --rm woordenboek    # → teksten/woordenboek_extra.dict
+git add teksten && git commit -m "Update practice texts" && git push
 ```
 
-De pagina en de voorbeeldtaak lezen de nieuwe teksten vanzelf; de voorbeeldstem maakt alleen nieuwe of gewijzigde
+Op de server daarna alleen `git pull`. De pagina en de voorbeeldtaak lezen de nieuwe teksten vanzelf; de voorbeeldstem maakt alleen nieuwe of gewijzigde
 stukken opnieuw en ruimt voorbeelden van verdwenen stukken op. Oude opnames houden de tekst waarop ze gemaakt zijn.
 
 Nieuwe code: `git pull && docker compose build && docker compose up -d`.
@@ -76,12 +74,10 @@ Nieuwe code: `git pull && docker compose build && docker compose up -d`.
 
 ## Gegevens
 
-Alles staat in `data/` (niet in git):
+De oefenteksten en de uitspraak van namen staan in `teksten/` (in git). Wat de trainer maakt, staat in `data/` (niet in git):
 
 | | |
 |---|---|
-| `teksten.json` | de oefenstukken (import) |
-| `woordenboek_extra.dict` | uitspraak van woorden die niet in het MFA-woordenboek staan |
 | `voorbeeld/<stuk>.wav` / `.json` | voorbeeldstem en de woordtijden daarvan |
 | `opnames/<gebruiker>/` | per opname: origineel, `-16k.wav`, `.meta.json` (tekst, microfoon), `.json` (analyse); `index.json` |
 | `caddy/` | certificaten (het rootcertificaat: `caddy/pki/authorities/local/root.crt`) |

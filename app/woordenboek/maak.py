@@ -1,5 +1,5 @@
 """Uitspraak voor woorden uit de teksten die niet in het MFA-woordenboek staan (vooral namen), met het G2P-model
-van MFA zelf (swedish_mfa) → /data/woordenboek_extra.dict. De MFA- en klanken-API lezen dat bestand bij elke
+van MFA zelf (swedish_mfa) → app/teksten/woordenboek_extra.dict (in git, naast de teksten). De MFA- en klanken-API lezen dat bestand bij elke
 analyse; zonder dit worden zulke woorden niet uitgelijnd en niet beoordeeld.
 
   python /app/woordenboek.py      (in het MFA-image; na de import)
@@ -14,11 +14,12 @@ from proef_common import normaliseer
 
 DATA = Path(os.environ.get("PROEF_DATA", "/data"))
 WB = Path(os.environ["MFA_ROOT_DIR"]) / "pretrained_models" / "dictionary" / "swedish_mfa.dict"
-UIT = DATA / "woordenboek_extra.dict"
+TEKSTEN = Path(os.environ.get("TEKSTEN", "/teksten/teksten.json"))
+UIT = Path(os.environ.get("WOORDENBOEK_EXTRA", "/teksten/woordenboek_extra.dict"))
 
 
 def main():
-    teksten = json.loads((DATA / "teksten.json").read_text(encoding="utf-8"))["teksten"]
+    teksten = json.loads(TEKSTEN.read_text(encoding="utf-8"))["teksten"]
     woorden = {w for t in teksten for s in t["stukken"] for w in normaliseer(s["tekst"]).split()}
     bekend = {r.split("\t", 1)[0] for r in WB.read_text(encoding="utf-8").splitlines() if r.strip()}
     nieuw = sorted(w for w in woorden - bekend if w.isalpha())
