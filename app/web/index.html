@@ -418,8 +418,11 @@ async function buffer(url) {
   })();
   try { return await buffers[url]; } catch (e) { delete buffers[url]; throw e; }
 }
-async function speel(url, van, tot) {
+async function speel(url, van, tot, volgende) {
   // Een stuk van een opname; de grenzen schuiven naar het stilste moment vlak buiten de woordgrens van MFA.
+  // volgende: begin van het volgende woord. Zit daartussen een pauze, dan loopt het stuk door tot het geluid
+  // echt ophoudt: MFA's woordenboek mist soms een klank (pluto = „p l ɵ ɔ”, zonder t) en zet het eind van het
+  // woord dan te vroeg; de rest belandt in de pauze ("plu" in plaats van "pluto").
   const b = await buffer(url);
   if (bron) { try { bron.stop(); } catch (e) {} }
   bron = audioCtx.createBufferSource(); bron.buffer = b;
@@ -428,7 +431,8 @@ async function speel(url, van, tot) {
   let start = 0, duur;
   if (van != null && tot != null) {
     start = stilsteMoment(b, van - 0.03, van);
-    const eind = stilsteMoment(b, tot, tot + 0.03);
+    let eind = stilsteMoment(b, tot, tot + 0.03);
+    if (volgende != null && volgende - tot > 0.1) eind = Math.max(eind, uitklinken(b, van, tot, volgende - 0.03));
     duur = Math.min(b.duration - start, eind - start);
     const nu = audioCtx.currentTime;
     gain.gain.setValueAtTime(0, nu);
@@ -437,6 +441,19 @@ async function speel(url, van, tot) {
     gain.gain.linearRampToValueAtTime(0, nu + duur);
   }
   await new Promise((klaar) => { bron.onended = klaar; bron.start(0, start, duur); });
+}
+function uitklinken(b, van, tot, grens) {
+  // Waar het geluid na 'tot' echt wegvalt: na het laatste geluid (energie boven 0,5% van het luidste stuk van
+  // het woord, ±7% in amplitude) 200 ms stilte. Een korte stilte telt niet: vóór een p, t of k is het ook even
+  // stil (pluto: 120 ms stil, dan een zachte „-to”). Hoogstens tot 'grens', plus 40 ms uitloop.
+  const x = b.getChannelData(0), sr = b.sampleRate, n = Math.round(0.01 * sr);
+  const energie = (t) => { let e = 0; const a = Math.round(t * sr); for (let k = a; k < Math.min(x.length, a + n); k++) e += x[k] * x[k]; return e / n; };
+  let piek = 0;
+  for (let t = van; t < tot; t += 0.01) piek = Math.max(piek, energie(t));
+  let laatsteGeluid = tot;
+  for (let t = tot; t < grens && t - laatsteGeluid < 0.2; t += 0.01)
+    if (energie(t) > 0.005 * piek) laatsteGeluid = t + 0.01;
+  return Math.min(grens, laatsteGeluid + 0.04);
 }
 function stilsteMoment(b, van, tot) {
   const x = b.getChannelData(0), sr = b.sampleRate, n = Math.round(0.01 * sr), stap = Math.round(0.0025 * sr);
@@ -454,9 +471,13 @@ async function vergelijk(i) {
   const knop = $("luisterwoorden").children[i];
   knop && knop.classList.add("actief");
   try {
+    // Begin van het volgende woord (of het eind van de opname): zover mag een woord uitklinken. Alleen bij het
+    // voorbeeld: daar is een pauze echt stil (alleen bij leestekens). In een eigen opname kan wat na een woord
+    // klinkt net zo goed het begin van het volgende woord of ademhaling zijn.
+    const na = (soort) => { const v = laatste.woorden.slice(i + 1).find((x) => x[soort]); return v ? v[soort][0] : w[soort][1] + 0.6; };
     if (w.eigen) await speel(laatste.audio.eigen, ...w.eigen);
     await new Promise((r) => setTimeout(r, 300));
-    if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld);
+    if (w.voorbeeld && laatste.audio.voorbeeld) await speel(laatste.audio.voorbeeld, ...w.voorbeeld, na("voorbeeld"));
   } finally { knop && knop.classList.remove("actief"); }
 }
 
