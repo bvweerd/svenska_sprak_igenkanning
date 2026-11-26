@@ -69,6 +69,8 @@ services:
     command: ["python", "klanken.py", "--server"]
     environment:
       KLANKEN_THREADS: ${ANALYSE_KERNEN:-3}
+      ONEDNN_PRIMITIVE_CACHE_CAPACITY: "8"   # elke opname heeft een andere lengte: kernelcache begrenzen
+      LRU_CACHE_CAPACITY: "8"
     volumes: [./data:/data]
     cpus: ${ANALYSE_KERNEN:-3}
     mem_limit: 3g
@@ -87,6 +89,13 @@ services:
     <<: *altijd
     image: proef-sv/klanken
     command: ["python", "/app/maak.py"]
+    environment:
+      # PyTorch bewaart per invoerlengte een gecompileerde kernel (oneDNN); elk stuk heeft een andere lengte, dus
+      # zonder grens groeit het geheugen ±150 MB per stuk.
+      ONEDNN_PRIMITIVE_CACHE_CAPACITY: "8"
+      LRU_CACHE_CAPACITY: "8"
+      MALLOC_ARENA_MAX: "2"
+      OPNIEUW_NA: "100"              # na zoveel stukken herstart de taak zichzelf (geheugen vrij)
     volumes:
       - ./data:/data
       - ./voorbeeld/maak.py:/app/maak.py:ro

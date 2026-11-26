@@ -25,6 +25,7 @@ TEKSTEN = DATA / "teksten.json"
 UIT = DATA / "voorbeeld"
 WEB = os.environ.get("WEB", "http://web:8080")
 MFA = os.environ.get("MFA_API", "http://mfa-api:8003")
+OPNIEUW_NA = int(os.environ.get("OPNIEUW_NA", 100))   # stukken per run (zie onder)
 
 
 def log(*a):
@@ -85,6 +86,7 @@ def main():
     torch.set_num_threads(1)
     UIT.mkdir(parents=True, exist_ok=True)
     model = tok = None
+    gedaan = 0
     while True:
         doen, totaal = te_doen()
         if not doen:
@@ -108,6 +110,12 @@ def main():
                 log(f"{stuk['id']}: uitlijnen mislukt: {e}")
             j.write_text(json.dumps(info, ensure_ascii=False), encoding="utf-8")
             log(f"{stuk['id']}: klaar in {time.time() - t0:.0f} s")
+            gedaan += 1
+            if gedaan >= OPNIEUW_NA:
+                # PyTorch-geheugen versnippert bij steeds andere invoerlengtes en groeit per stuk; Docker start de
+                # taak meteen opnieuw (restart: unless-stopped) en hij gaat verder waar hij was.
+                log(f"{gedaan} stukken gedaan: opnieuw starten om geheugen vrij te maken")
+                return
 
 
 if __name__ == "__main__":
